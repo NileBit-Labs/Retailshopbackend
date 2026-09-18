@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'shop.access' => \App\Http\Middleware\EnsureShopAccess::class,
         ]);
+
+        // This app is API-only - there's no "login" web route to redirect
+        // unauthenticated requests to, so always fall through to a JSON
+        // 401 instead of Authenticate's default redirect-to-login behaviour.
+        Authenticate::redirectUsing(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
