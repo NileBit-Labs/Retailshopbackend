@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureShopAccess;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'shop.access' => \App\Http\Middleware\EnsureShopAccess::class,
+            'shop.access' => EnsureShopAccess::class,
         ]);
 
         // This app is API-only - there's no "login" web route to redirect
