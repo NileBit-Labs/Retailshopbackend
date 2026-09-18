@@ -33,7 +33,9 @@ php artisan migrate
 php artisan serve
 ```
 
-API is now at `http://localhost:8000`. Run `php artisan test` before opening a PR — it must pass (tests run against an in-memory SQLite, not Postgres, so no extra setup needed there).
+API is now at `http://localhost:8200` — pinned via `SERVER_PORT` in `.env.example`, not Laravel's default 8000, since port 8000 is the default for basically every Laravel project and will collide with any other one you have running locally. If you ever see a working login form suddenly fail with "The route api/... could not be found", it almost always means something *else* is squatting on this port — check `lsof -nP -iTCP -sTCP:LISTEN` before assuming the code is broken.
+
+Run `php artisan test` before opening a PR — it must pass (tests run against an in-memory SQLite, not Postgres, so no extra setup needed there).
 
 ## Module ownership
 
