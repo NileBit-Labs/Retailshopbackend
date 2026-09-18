@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\PosCatalogController;
+use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShopController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,4 +21,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/shops', [ShopController::class, 'store']);
     Route::get('/shops/{shop}', [ShopController::class, 'show']);
     Route::patch('/shops/{shop}', [ShopController::class, 'update']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware('shop.access')->group(function () {
+        Route::get('/pos/products', [PosCatalogController::class, 'index']);
+
+        Route::get('/sales', [SaleController::class, 'index']);
+        Route::post('/sales', [SaleController::class, 'store']);
+        Route::get('/sales/{sale}', [SaleController::class, 'show']);
+    });
+
+    Route::post('/sales/{sale}/void', [SaleController::class, 'void'])
+        ->middleware('shop.access:owner,manager');
 });
