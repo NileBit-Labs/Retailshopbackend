@@ -27,7 +27,7 @@ class SaleController extends Controller
         $shop = $request->attributes->get('shop');
 
         $query = Sale::where('shop_id', $shop->id)
-            ->with('cashier:id,name', 'payments')
+            ->with('cashier:id,name', 'payments', 'customer:id,name')
             ->withCount('items')
             ->latest('id');
 
@@ -77,7 +77,7 @@ class SaleController extends Controller
             $query->where('cashier_id', $request->user()->id);
         }
 
-        return $query->with('items', 'payments', 'cashier:id,name')->findOrFail($id);
+        return $query->with('items', 'payments', 'cashier:id,name', 'customer:id,name,phone')->findOrFail($id);
     }
 
     private function isCashier(Request $request): bool
@@ -88,7 +88,7 @@ class SaleController extends Controller
     /** @return array<string, mixed> */
     private function receipt(Request $request, Sale $sale): array
     {
-        $sale->loadMissing('items', 'payments', 'cashier:id,name');
+        $sale->loadMissing('items', 'payments', 'cashier:id,name', 'customer:id,name,phone');
         $shop = $request->attributes->get('shop');
 
         return $sale->toArray() + [

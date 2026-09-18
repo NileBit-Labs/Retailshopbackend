@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PosCatalogController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShopController;
@@ -32,10 +33,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/sales', [SaleController::class, 'store']);
         Route::get('/sales/{sale}', [SaleController::class, 'show']);
 
+        Route::get('/customers', [CustomerController::class, 'index']);
+        Route::post('/customers', [CustomerController::class, 'store']);
+        Route::get('/customers/{customer}', [CustomerController::class, 'show']);
+        Route::post('/customers/{customer}/payments', [CustomerController::class, 'pay']);
+
         Route::post('/sync/push', [SyncController::class, 'push']);
         Route::get('/sync/pull', [SyncController::class, 'pull']);
     });
 
-    Route::post('/sales/{sale}/void', [SaleController::class, 'void'])
-        ->middleware('shop.access:owner,manager');
+    Route::middleware('shop.access:owner,manager')->group(function () {
+        Route::post('/sales/{sale}/void', [SaleController::class, 'void']);
+        Route::patch('/customers/{customer}', [CustomerController::class, 'update']);
+        Route::get('/customers/{customer}/ledger', [CustomerController::class, 'ledger']);
+    });
 });

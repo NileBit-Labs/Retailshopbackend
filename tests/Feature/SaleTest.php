@@ -200,7 +200,7 @@ class SaleTest extends TestCase
         ])->assertCreated()->assertJsonCount(2, 'payments');
     }
 
-    public function test_a_short_payment_is_rejected_until_credit_sales_exist(): void
+    public function test_a_short_payment_needs_a_customer_to_owe_the_rest(): void
     {
         [$user, $shop] = $this->shopWithMember();
         $product = $this->productWithStock($shop, $user, price: 1000);

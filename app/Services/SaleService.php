@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\MovementType;
 use App\Enums\PaymentMethod;
+use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
@@ -25,6 +26,7 @@ class SaleService
     public function __construct(
         private StockService $stock,
         private AuditLogger $audit,
+        private CustomerLedger $ledger,
     ) {}
 
     /**
@@ -88,6 +90,11 @@ class SaleService
                 ]);
             }
 
+            if ($locked->amount_due > 0 && $locked->customer_id) {
+                $customer = Customer::lockForUpdate()->find($locked->customer_id);
+                $this->ledger->record($customer, CustomerLedger::SALE_VOID, -$locked->amount_due, $user, $locked, "Void of {$locked->sale_number}");
+            }
+
             $before = ['status' => $locked->status];
 
             $locked->update([
@@ -117,7 +124,7 @@ class SaleService
     private function fresh(Sale $sale): Sale
     {
         $wasCreated = $sale->wasRecentlyCreated;
-        $sale = Sale::with('items', 'payments', 'cashier:id,name')->findOrFail($sale->id);
+        $sale = Sale::with('items', 'payments', 'cashier:id,name', 'customer:id,name,phone')->findOrFail($sale->id);
         $sale->wasRecentlyCreated = $wasCreated;
 
         return $sale;
@@ -127,6 +134,15 @@ class SaleService
     private function complete(Shop $shop, User $cashier, array $data): Sale
     {
         $lines = $data['items'];
+
+        $customer = null;
+        if (! empty($data['customer_id'])) {
+            $customer = Customer::where('shop_id', $shop->id)->lockForUpdate()->find($data['customer_id']);
+
+            if (! $customer) {
+                throw ValidationException::withMessages(['customer_id' => 'This customer is not in this shop.']);
+            }
+        }
 
         // Lock the products (in id order, so concurrent sales can't deadlock)
         // before reading stock, so two sales can't both take the last item.
@@ -229,8 +245,10 @@ class SaleService
         [$payments, $amountPaid] = $this->settlePayments($data['payments'] ?? [], $total);
         $amountDue = $total - $amountPaid;
 
-        if ($amountDue > 0) {
-            $this->assertCreditAllowed($data, $amountDue);
+        if ($amountDue > 0 && ! $customer) {
+            throw ValidationException::withMessages([
+                'customer_id' => 'Choose a customer to sell on credit — the unpaid '.$amountDue.' has to be owed by someone.',
+            ]);
         }
 
         // Atomic per-shop counter; the row lock it takes serialises numbering.
@@ -240,7 +258,7 @@ class SaleService
         $sale = Sale::create([
             'shop_id' => $shop->id,
             'sale_number' => sprintf('S-%06d', $number),
-            'customer_id' => $data['customer_id'] ?? null,
+            'customer_id' => $customer?->id,
             'cashier_id' => $cashier->id,
             'subtotal' => $gross,
             'discount' => $discount,
@@ -299,6 +317,10 @@ class SaleService
             ]);
         }
 
+        if ($amountDue > 0) {
+            $this->ledger->record($customer, CustomerLedger::CREDIT_SALE, $amountDue, $cashier, $sale, $sale->sale_number);
+        }
+
         return $this->fresh($sale);
     }
 
@@ -340,13 +362,5 @@ class SaleService
         }
 
         return [$rows, $tendered];
-    }
-
-    /** @param  array<string, mixed>  $data */
-    private function assertCreditAllowed(array $data, int $amountDue): void
-    {
-        throw ValidationException::withMessages([
-            'payments' => "Payment is short by {$amountDue}. Full payment is required.",
-        ]);
     }
 }
