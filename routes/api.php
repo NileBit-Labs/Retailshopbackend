@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\PosCatalogController;
+use App\Http\Controllers\RefundController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\SyncController;
@@ -45,6 +46,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('shop.access:owner,manager')->group(function () {
         Route::post('/sales/{sale}/void', [SaleController::class, 'void']);
+        Route::get('/sales/{sale}/refundable', [RefundController::class, 'refundable']);
+        Route::post('/sales/{sale}/refund', [RefundController::class, 'store']);
         Route::patch('/customers/{customer}', [CustomerController::class, 'update']);
         Route::get('/customers/{customer}/ledger', [CustomerController::class, 'ledger']);
 

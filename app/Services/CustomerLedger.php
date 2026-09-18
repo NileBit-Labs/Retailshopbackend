@@ -19,6 +19,8 @@ class CustomerLedger
 
     public const SALE_VOID = 'SALE_VOID';
 
+    public const REFUND = 'REFUND';
+
     public function balance(Customer $customer): int
     {
         return (int) CustomerLedgerEntry::where('customer_id', $customer->id)->sum('amount');

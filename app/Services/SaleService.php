@@ -7,6 +7,7 @@ use App\Enums\PaymentMethod;
 use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Models\Refund;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Shop;
@@ -63,6 +64,10 @@ class SaleService
 
             if ($locked->status !== 'completed') {
                 throw ValidationException::withMessages(['sale' => 'This sale has already been voided.']);
+            }
+
+            if (Refund::where('sale_id', $locked->id)->exists()) {
+                throw ValidationException::withMessages(['sale' => 'This sale has been refunded, so it can no longer be voided.']);
             }
 
             $locked->load('items', 'payments');
