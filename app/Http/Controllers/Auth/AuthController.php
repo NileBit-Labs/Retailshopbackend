@@ -41,7 +41,7 @@ class AuthController extends Controller
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
-            'user' => $user->fresh('organization'),
+            'user' => $user->fresh(['organization', 'shopRoles.shop']),
             'token' => $token,
         ], 201);
     }
@@ -64,7 +64,7 @@ class AuthController extends Controller
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
-            'user' => $user->fresh('organization'),
+            'user' => $user->fresh(['organization', 'shopRoles.shop']),
             'token' => $token,
         ]);
     }
