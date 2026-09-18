@@ -6,6 +6,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\PosCatalogController;
 use App\Http\Controllers\RefundController;
 use App\Http\Controllers\SaleController;
+use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\SyncController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +40,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/customers', [CustomerController::class, 'store']);
         Route::get('/customers/{customer}', [CustomerController::class, 'show']);
         Route::post('/customers/{customer}/payments', [CustomerController::class, 'pay']);
+
+        Route::post('/shifts/open', [ShiftController::class, 'open']);
+        Route::get('/shifts/current', [ShiftController::class, 'current']);
+        Route::get('/shifts', [ShiftController::class, 'index']);
+        Route::get('/shifts/{shift}', [ShiftController::class, 'show']);
+        Route::post('/shifts/{shift}/close', [ShiftController::class, 'close']);
 
         Route::post('/sync/push', [SyncController::class, 'push']);
         Route::get('/sync/pull', [SyncController::class, 'pull']);
