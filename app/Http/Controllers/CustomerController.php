@@ -151,7 +151,10 @@ class CustomerController extends Controller
                 'recorded_by' => $request->user()->id,
             ]);
 
-            $ledger->record($model, CustomerLedger::PAYMENT, -$data['amount'], $request->user(), $payment, 'Repayment');
+            $method = ucwords(strtolower(str_replace('_', ' ', $data['method'])));
+            $note = $method.(! empty($data['reference']) ? " · {$data['reference']}" : '');
+
+            $ledger->record($model, CustomerLedger::PAYMENT, -$data['amount'], $request->user(), $payment, $note);
         });
 
         $open = $debt->openSales([$customer]);
