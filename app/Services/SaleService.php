@@ -11,6 +11,7 @@ use App\Models\SaleItem;
 use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -167,6 +168,12 @@ class SaleService
                 $unitPrice = $unit->selling_price;
             }
 
+            // Only the sync path sets this, after a manager approves it: a sale
+            // rung up offline is recorded at the price the customer was charged.
+            if (($data['allow_price_override'] ?? false) && isset($line['unit_price'])) {
+                $unitPrice = (int) $line['unit_price'];
+            }
+
             $lineGross = (int) round($quantity * $unitPrice);
             $lineDiscount = (int) ($line['discount'] ?? 0);
 
@@ -215,6 +222,10 @@ class SaleService
             throw ValidationException::withMessages(['items' => 'The sale total must be more than zero.']);
         }
 
+        if (isset($data['expected_total']) && ! ($data['allow_price_override'] ?? false) && $total !== (int) $data['expected_total']) {
+            throw new PriceChanged($total, (int) $data['expected_total']);
+        }
+
         [$payments, $amountPaid] = $this->settlePayments($data['payments'] ?? [], $total);
         $amountDue = $total - $amountPaid;
 
@@ -240,7 +251,13 @@ class SaleService
             'status' => 'completed',
             'idempotency_key' => $data['idempotency_key'] ?? null,
             'client_created_at' => $data['client_created_at'] ?? null,
+            'synced_at' => $data['synced_at'] ?? null,
         ]);
+
+        if (! empty($data['client_created_at'])) {
+            $happenedAt = Carbon::parse($data['client_created_at']);
+            $sale->forceFill(['created_at' => $happenedAt->isFuture() ? now() : $happenedAt])->save();
+        }
 
         foreach ($priced as $line) {
             $product = $line['product'];

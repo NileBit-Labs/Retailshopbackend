@@ -35,6 +35,7 @@ class StoreSaleRequest extends FormRequest
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:1000000'],
             'items.*.unit' => ['nullable', 'string', 'max:50'],
             'items.*.discount' => ['nullable', 'integer', 'min:0'],
+            'items.*.unit_price' => ['nullable', 'integer', 'min:0'],
 
             'payments' => ['nullable', 'array', 'max:10'],
             'payments.*.method' => ['required', Rule::enum(PaymentMethod::class)],

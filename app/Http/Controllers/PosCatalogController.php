@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Support\PosProductPresenter;
 use Illuminate\Http\Request;
 
 /**
@@ -30,21 +31,6 @@ class PosCatalogController extends Controller
             });
         }
 
-        return $query->get()->map(fn (Product $product) => [
-            'id' => $product->id,
-            'name' => $product->name,
-            'sku' => $product->sku,
-            'barcode' => $product->barcode,
-            'category' => $product->category?->name,
-            'base_unit' => $product->base_unit,
-            'selling_price' => $product->selling_price,
-            'stock' => round((float) ($product->stock ?? 0), 3),
-            'low_stock_threshold' => $product->low_stock_threshold,
-            'units' => $product->units->map(fn ($unit) => [
-                'unit_name' => $unit->unit_name,
-                'conversion_to_base_unit' => $unit->conversion_to_base_unit,
-                'selling_price' => $unit->selling_price,
-            ])->values(),
-        ])->values();
+        return $query->get()->map(fn (Product $product) => PosProductPresenter::format($product))->values();
     }
 }

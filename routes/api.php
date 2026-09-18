@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\PosCatalogController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\SyncController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -30,6 +31,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/sales', [SaleController::class, 'index']);
         Route::post('/sales', [SaleController::class, 'store']);
         Route::get('/sales/{sale}', [SaleController::class, 'show']);
+
+        Route::post('/sync/push', [SyncController::class, 'push']);
+        Route::get('/sync/pull', [SyncController::class, 'pull']);
     });
 
     Route::post('/sales/{sale}/void', [SaleController::class, 'void'])
