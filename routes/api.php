@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\PosCatalogController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShopController;
@@ -46,5 +47,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/sales/{sale}/void', [SaleController::class, 'void']);
         Route::patch('/customers/{customer}', [CustomerController::class, 'update']);
         Route::get('/customers/{customer}/ledger', [CustomerController::class, 'ledger']);
+
+        Route::get('/expenses', [ExpenseController::class, 'index']);
+        Route::post('/expenses', [ExpenseController::class, 'store']);
+        Route::patch('/expenses/{expense}', [ExpenseController::class, 'update']);
     });
 });
