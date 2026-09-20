@@ -89,7 +89,7 @@ class PurchaseService
             'supplier_id' => $supplier->id,
             'purchase_number' => sprintf('P-%06d', $number),
             'status' => 'received',
-            'purchase_date' => $data['purchase_date'] ?? now()->toDateString(),
+            'purchase_date' => $data['purchase_date'] ?? $shop->today(),
             'reference' => $data['reference'] ?? null,
             'total' => $total,
             'amount_paid' => $paid,

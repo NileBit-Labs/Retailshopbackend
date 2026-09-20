@@ -57,7 +57,7 @@ class PurchaseController extends Controller
     {
         $data = $request->validate([
             'supplier_id' => ['required', 'integer'],
-            'purchase_date' => ['nullable', 'date', 'before_or_equal:today'],
+            'purchase_date' => ['nullable', 'date', 'before_or_equal:'.$request->attributes->get('shop')->today()],
             'reference' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1', 'max:100'],

@@ -192,7 +192,7 @@ class CustomerController extends Controller
             'phone' => $customer->phone,
             'balance' => $balance,
             'oldest_due_date' => $oldestDue,
-            'overdue' => $balance > 0 && $oldestDue !== null && $oldestDue < now()->toDateString(),
+            'overdue' => $balance > 0 && $oldestDue !== null && $oldestDue < request()->attributes->get('shop')->today(),
         ];
 
         if ($manager) {
