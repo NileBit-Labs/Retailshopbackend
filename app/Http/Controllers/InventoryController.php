@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\MovementType;
 use App\Models\Product;
+use App\Models\Purchase;
 use App\Models\Refund;
 use App\Models\Sale;
 use App\Models\StockMovement;
@@ -205,6 +206,10 @@ class InventoryController extends Controller
 
         foreach (Sale::whereIn('id', $ids(Sale::class))->get(['id', 'sale_number']) as $sale) {
             $labels[Sale::class][$sale->id] = $sale->sale_number;
+        }
+
+        foreach (Purchase::whereIn('id', $ids(Purchase::class))->get(['id', 'purchase_number']) as $purchase) {
+            $labels[Purchase::class][$purchase->id] = $purchase->purchase_number;
         }
 
         foreach ($ids(Refund::class) as $id) {

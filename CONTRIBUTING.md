@@ -53,7 +53,8 @@ These come from the plan's "business logic freeze". Most are release blockers, a
 
 - **Money is an integer** number of UGX (`unsignedBigInteger`), never a float. Quantities are `decimal(12,3)`.
 - **Stock only changes through `StockService`.** Stock is never a stored number; it is the sum of the append-only `stock_movements` ledger. Never `update` a product's quantity, never write to `stock_movements` directly.
-- **Balances are ledgers.** A customer's balance is the sum of `customer_ledger_entries` (`CustomerLedger` is the only writer). Supplier balances should follow the same pattern.
+- **Balances are ledgers.** A customer's balance is the sum of `customer_ledger_entries` (`CustomerLedger` is the only writer); a supplier's is the sum of `supplier_ledger_entries` (`SupplierLedger`). Repayments are applied to the oldest unpaid credit sale / purchase first (`CustomerDebt`, `SupplierDebt`), so nothing is stored per invoice that could drift from the ledger.
+- **Cost is a weighted average.** Receiving a purchase (`PurchaseService`) blends the product's `current_cost` with the stock already on the shelf; cancelling it puts the cost back only if nothing has moved it since. Payments to suppliers are shop money, not till money, so they don't count towards a shift's expected cash.
 - **Financial records are append-only.** Money going back out (void, refund) is a *new* `payments` row with `direction = 'out'`; a correction is a new opposite entry. Don't edit or delete past sales, payments, movements or ledger rows.
 - **History is immutable.** Price and cost are copied onto `sale_items` at sale time so a later price change can never rewrite past profit.
 - **Never trust the client's totals.** Recompute prices/totals on the server (see `SaleService`). A field the client sends is data, not authority.
