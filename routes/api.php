@@ -1,9 +1,13 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PosCatalogController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\RefundController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShiftController;
@@ -57,6 +61,26 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/sales/{sale}/refund', [RefundController::class, 'store']);
         Route::patch('/customers/{customer}', [CustomerController::class, 'update']);
         Route::get('/customers/{customer}/ledger', [CustomerController::class, 'ledger']);
+
+        Route::get('/products', [ProductController::class, 'index']);
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::post('/products/import', [ProductImportController::class, 'store']);
+        Route::get('/products/{product}', [ProductController::class, 'show']);
+        Route::patch('/products/{product}', [ProductController::class, 'update']);
+        Route::post('/products/{product}/archive', [ProductController::class, 'archive']);
+        Route::post('/products/{product}/restore', [ProductController::class, 'restore']);
+
+        Route::get('/categories', [CategoryController::class, 'index']);
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::patch('/categories/{category}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
+
+        Route::get('/inventory', [InventoryController::class, 'index']);
+        Route::get('/inventory/movements', [InventoryController::class, 'movements']);
+        Route::post('/inventory/adjustments', [InventoryController::class, 'adjust']);
+        Route::post('/inventory/damage', [InventoryController::class, 'damage']);
+        Route::post('/inventory/loss', [InventoryController::class, 'loss']);
+        Route::post('/inventory/opening-stock', [InventoryController::class, 'openingStock']);
 
         Route::get('/expenses', [ExpenseController::class, 'index']);
         Route::post('/expenses', [ExpenseController::class, 'store']);
