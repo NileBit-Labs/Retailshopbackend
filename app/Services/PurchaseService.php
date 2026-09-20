@@ -111,10 +111,13 @@ class PurchaseService
             );
 
             // Weighted average: what the stock already on the shelf cost, blended with what just arrived.
-            $product->update(['current_cost' => $stockBefore > 0
-                ? (int) round(($stockBefore * $product->current_cost + $item->base_quantity * $item->base_unit_cost) / ($stockBefore + $item->base_quantity))
-                : $item->base_unit_cost,
-            ]);
+            $costBefore = $product->current_cost;
+            $costAfter = $stockBefore > 0
+                ? (int) round(($stockBefore * $costBefore + $item->base_quantity * $item->base_unit_cost) / ($stockBefore + $item->base_quantity))
+                : $item->base_unit_cost;
+
+            $product->update(['current_cost' => $costAfter]);
+            $item->update(['cost_before' => $costBefore, 'cost_after' => $costAfter]);
         }
 
         if ($paid > 0) {
@@ -179,6 +182,16 @@ class PurchaseService
                     $products[$item->product_id], -$item->base_quantity, MovementType::PurchaseReturn, $by,
                     $purchase, "{$purchase->purchase_number} cancelled: {$reason}", $item->base_unit_cost,
                 );
+            }
+
+            // Put each cost back, newest line first, but only where nothing has moved it since: a later
+            // purchase's average already includes this stock and must not be overwritten.
+            foreach ($items->sortByDesc('id') as $item) {
+                $product = $products[$item->product_id];
+
+                if ($item->cost_before !== null && $product->current_cost === $item->cost_after) {
+                    $product->update(['current_cost' => $item->cost_before]);
+                }
             }
 
             if ($purchase->amount_due > 0) {

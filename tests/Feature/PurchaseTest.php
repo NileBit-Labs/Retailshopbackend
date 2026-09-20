@@ -242,6 +242,48 @@ class PurchaseTest extends TestCase
         $this->assertSame(3, StockMovement::where('product_id', $product->id)->count());
     }
 
+    public function test_cancelling_puts_the_cost_back_when_nothing_else_has_changed_it(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $product = $this->productWithStock($shop, $owner, cost: 3800, stock: 60);
+        $id = $this->receive($owner, $shop, $this->supplier($shop), [['product_id' => $product->id, 'quantity' => 40, 'unit_cost' => 4000]])->json('id');
+        $this->assertSame(3880, $product->fresh()->current_cost);
+
+        $this->api($owner, $shop)->postJson("/api/purchases/{$id}/cancel", ['reason' => 'Mistake'])->assertOk();
+
+        $this->assertSame(3800, $product->fresh()->current_cost);
+    }
+
+    public function test_cancelling_leaves_the_cost_alone_when_a_later_purchase_has_moved_it(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $supplier = $this->supplier($shop);
+        $product = $this->productWithStock($shop, $owner, cost: 3800, stock: 60);
+        $first = $this->receive($owner, $shop, $supplier, [['product_id' => $product->id, 'quantity' => 40, 'unit_cost' => 4000]])->json('id');
+        $this->receive($owner, $shop, $supplier, [['product_id' => $product->id, 'quantity' => 100, 'unit_cost' => 4200]])->assertCreated();
+        $costNow = $product->fresh()->current_cost;
+
+        $this->api($owner, $shop)->postJson("/api/purchases/{$first}/cancel", ['reason' => 'Mistake'])->assertOk();
+
+        $this->assertSame($costNow, $product->fresh()->current_cost);
+    }
+
+    public function test_two_lines_for_the_same_product_unwind_back_to_the_original_cost(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $product = $this->productWithStock($shop, $owner, cost: 1000, stock: 10);
+        $id = $this->receive($owner, $shop, $this->supplier($shop), [
+            ['product_id' => $product->id, 'quantity' => 10, 'unit_cost' => 2000],
+            ['product_id' => $product->id, 'quantity' => 20, 'unit_cost' => 3000],
+        ])->assertCreated()->json('id');
+        $this->assertNotSame(1000, $product->fresh()->current_cost);
+
+        $this->api($owner, $shop)->postJson("/api/purchases/{$id}/cancel", ['reason' => 'Mistake'])->assertOk();
+
+        $this->assertSame(1000, $product->fresh()->current_cost);
+        $this->assertSame(10.0, $this->stock($product));
+    }
+
     public function test_a_cancelled_purchase_cannot_be_cancelled_again(): void
     {
         [$owner, $shop] = $this->shopWithMember();

@@ -9,7 +9,7 @@ class PurchaseItem extends Model
 {
     protected $fillable = [
         'purchase_id', 'product_id', 'quantity', 'unit_name', 'conversion', 'unit_cost',
-        'line_total', 'base_quantity', 'base_unit_cost',
+        'line_total', 'base_quantity', 'base_unit_cost', 'cost_before', 'cost_after',
     ];
 
     protected function casts(): array
