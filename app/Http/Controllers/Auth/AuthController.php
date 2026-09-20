@@ -61,12 +61,39 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($user->status !== 'active') {
+            throw ValidationException::withMessages([
+                'email' => ['This account has been deactivated. Please ask the shop owner.'],
+            ]);
+        }
+
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
             'user' => $user->fresh(['organization', 'shopRoles.shop']),
             'token' => $token,
         ]);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'max:100', 'different:current_password'],
+        ]);
+
+        $user = $request->user();
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages(['current_password' => ['That is not your current password.']]);
+        }
+
+        $user->update(['password' => $data['password']]);
+
+        // Every other signed-in device is signed out; this one stays.
+        $user->tokens()->where('id', '!=', $user->currentAccessToken()->id)->delete();
+
+        return response()->json(['message' => 'Password changed.']);
     }
 
     public function logout(Request $request)
