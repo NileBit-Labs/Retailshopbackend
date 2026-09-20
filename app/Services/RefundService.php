@@ -12,6 +12,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Shop;
 use App\Models\User;
+use App\Support\DiscountAllocation;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -242,26 +243,6 @@ class RefundService
      */
     private function netValues(Sale $sale): array
     {
-        $items = $sale->items->sortBy('id');
-        $orderDiscount = max(0, $sale->discount - $items->sum('discount'));
-        $lineSum = (int) $items->sum('line_total');
-
-        $share = [];
-        $left = $orderDiscount;
-
-        foreach ($items as $item) {
-            $share[$item->id] = $lineSum > 0 ? intdiv($orderDiscount * $item->line_total, $lineSum) : 0;
-            $left -= $share[$item->id];
-        }
-
-        foreach ($items as $item) {
-            if ($left <= 0) {
-                break;
-            }
-            $share[$item->id]++;
-            $left--;
-        }
-
-        return $items->mapWithKeys(fn (SaleItem $item) => [$item->id => $item->line_total - $share[$item->id]])->all();
+        return DiscountAllocation::netValues($sale->items, $sale->discount);
     }
 }

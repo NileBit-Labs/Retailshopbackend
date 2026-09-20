@@ -6,6 +6,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\PosCatalogController;
 use App\Http\Controllers\RefundController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShopController;
@@ -34,6 +35,8 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('shop.access')->group(function () {
         Route::get('/pos/products', [PosCatalogController::class, 'index']);
+
+        Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
 
         Route::get('/sales', [SaleController::class, 'index']);
         Route::post('/sales', [SaleController::class, 'store']);
@@ -65,6 +68,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/expenses', [ExpenseController::class, 'store']);
         Route::patch('/expenses/{expense}', [ExpenseController::class, 'update']);
 
+        Route::get('/reports/sales', [ReportController::class, 'sales']);
+        Route::get('/reports/stock', [ReportController::class, 'stock']);
+        Route::get('/reports/debt', [ReportController::class, 'debt']);
+
         Route::get('/staff', [StaffController::class, 'index']);
         Route::post('/staff', [StaffController::class, 'store']);
         Route::patch('/staff/{user}', [StaffController::class, 'update']);
@@ -73,5 +80,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('shop.access:owner')->group(function () {
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
+        Route::get('/reports/profit', [ReportController::class, 'profit']);
     });
 });

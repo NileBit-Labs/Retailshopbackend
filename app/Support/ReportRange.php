@@ -6,6 +6,7 @@ use App\Models\Shop;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -28,7 +29,9 @@ class ReportRange
 
     public static function timezoneFor(Shop $shop): string
     {
-        return $shop->organization?->timezone ?: 'Africa/Kampala';
+        $tz = $shop->organization?->timezone;
+
+        return $tz && in_array($tz, timezone_identifiers_list(), true) ? $tz : 'Africa/Kampala';
     }
 
     /**
@@ -88,6 +91,25 @@ class ReportRange
     public function utcTo(): CarbonImmutable
     {
         return $this->to->endOfDay()->utc();
+    }
+
+    /**
+     * SQL that turns a stored UTC timestamp column into its local calendar
+     * date (Y-m-d), for grouping by day inside the database.
+     *
+     * The zone is checked against the known list in timezoneFor(), so it is
+     * safe to place in the statement. SQLite has no timezone database and is
+     * only used by tests, so it gets the zone's current fixed offset.
+     */
+    public function localDateSql(string $column): string
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            return "to_char(({$column} AT TIME ZONE 'UTC') AT TIME ZONE '{$this->timezone}', 'YYYY-MM-DD')";
+        }
+
+        $minutes = intdiv($this->from->setTimezone($this->timezone)->getOffset(), 60);
+
+        return sprintf("date(%s, '%+d minutes')", $column, $minutes);
     }
 
     /** The local calendar date (Y-m-d) a stored UTC timestamp falls on. */

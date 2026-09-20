@@ -36,6 +36,21 @@ class StockService
             ->all();
     }
 
+    /**
+     * Stock on hand for every product in the shop that has any movement.
+     *
+     * @return array<int, float> product id => quantity
+     */
+    public function levelsForShop(int $shopId): array
+    {
+        return StockMovement::where('shop_id', $shopId)
+            ->selectRaw('product_id, SUM(quantity_delta) as stock')
+            ->groupBy('product_id')
+            ->pluck('stock', 'product_id')
+            ->map(fn ($stock) => round((float) $stock, 3))
+            ->all();
+    }
+
     public function record(
         Product $product,
         float $delta,

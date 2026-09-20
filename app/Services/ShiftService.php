@@ -25,12 +25,15 @@ class ShiftService
     public function open(Shop $shop, User $cashier, int $openingCash): Shift
     {
         try {
-            return Shift::create([
+            // Its own transaction, so the expected clash on the one-open-shift
+            // index is rolled back cleanly (PostgreSQL refuses further queries
+            // in a transaction that has hit a constraint error).
+            return DB::transaction(fn () => Shift::create([
                 'shop_id' => $shop->id,
                 'cashier_id' => $cashier->id,
                 'opening_cash' => $openingCash,
                 'opened_at' => now(),
-            ]);
+            ]));
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['shift' => 'You already have a shift open. Close it before opening another.']);
         }
