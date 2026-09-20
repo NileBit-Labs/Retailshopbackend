@@ -59,6 +59,7 @@ class StockService
         ?Model $reference = null,
         ?string $reason = null,
         ?int $unitCost = null,
+        ?string $idempotencyKey = null,
     ): StockMovement {
         return StockMovement::create([
             'shop_id' => $product->shop_id,
@@ -70,6 +71,7 @@ class StockService
             'reference_id' => $reference?->getKey(),
             'reason' => $reason,
             'performed_by' => $by->id,
+            'idempotency_key' => $idempotencyKey,
         ]);
     }
 }
