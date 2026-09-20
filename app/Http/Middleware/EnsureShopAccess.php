@@ -22,6 +22,9 @@ class EnsureShopAccess
     {
         $shopId = $request->header('X-Shop-Id') ?? $request->route('shop');
 
+        // A deactivated account is refused even if a token somehow survived.
+        abort_if($request->user()->status !== 'active', 403, 'This account has been deactivated.');
+
         abort_if(! $shopId, 400, 'X-Shop-Id header is required.');
 
         $shop = Shop::find($shopId);

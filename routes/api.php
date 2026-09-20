@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ExpenseController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\RefundController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\StaffController;
 use App\Http\Controllers\SyncController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,6 +20,7 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/refresh', [AuthController::class, 'refresh']);
+        Route::post('/change-password', [AuthController::class, 'changePassword']);
         Route::get('/me', [AuthController::class, 'me']);
     });
 });
@@ -61,5 +64,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/expenses', [ExpenseController::class, 'index']);
         Route::post('/expenses', [ExpenseController::class, 'store']);
         Route::patch('/expenses/{expense}', [ExpenseController::class, 'update']);
+
+        Route::get('/staff', [StaffController::class, 'index']);
+        Route::post('/staff', [StaffController::class, 'store']);
+        Route::patch('/staff/{user}', [StaffController::class, 'update']);
+        Route::post('/staff/{user}/password', [StaffController::class, 'resetPassword']);
+    });
+
+    Route::middleware('shop.access:owner')->group(function () {
+        Route::get('/audit-logs', [AuditLogController::class, 'index']);
     });
 });
