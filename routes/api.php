@@ -8,10 +8,12 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PosCatalogController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
+use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\RefundController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SyncController;
 use Illuminate\Support\Facades\Route;
 
@@ -81,6 +83,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/inventory/damage', [InventoryController::class, 'damage']);
         Route::post('/inventory/loss', [InventoryController::class, 'loss']);
         Route::post('/inventory/opening-stock', [InventoryController::class, 'openingStock']);
+
+        Route::get('/suppliers', [SupplierController::class, 'index']);
+        Route::post('/suppliers', [SupplierController::class, 'store']);
+        Route::get('/suppliers/{supplier}', [SupplierController::class, 'show']);
+        Route::patch('/suppliers/{supplier}', [SupplierController::class, 'update']);
+        Route::get('/suppliers/{supplier}/ledger', [SupplierController::class, 'ledger']);
+        Route::post('/suppliers/{supplier}/payments', [SupplierController::class, 'pay']);
+
+        Route::get('/purchases', [PurchaseController::class, 'index']);
+        Route::post('/purchases', [PurchaseController::class, 'store']);
+        Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
+        Route::post('/purchases/{purchase}/cancel', [PurchaseController::class, 'cancel']);
 
         Route::get('/expenses', [ExpenseController::class, 'index']);
         Route::post('/expenses', [ExpenseController::class, 'store']);

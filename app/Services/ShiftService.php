@@ -14,6 +14,8 @@ use Illuminate\Validation\ValidationException;
  * the cash this cashier took in, minus the cash they paid back out
  * (refunds, voids), over the shift's time window.
  *
+ * Payments to suppliers are shop money, not till money, so they are left out.
+ *
  * A sale's cash is timed by when the *sale happened*, not when it reached
  * the server, so a sale made offline during the shift and synced after it
  * closes still belongs to that shift.
@@ -87,6 +89,7 @@ class ShiftService
             ->leftJoin('sales', 'sales.id', '=', 'payments.sale_id')
             ->where('payments.shop_id', $shift->shop_id)
             ->where('payments.recorded_by', $shift->cashier_id)
+            ->whereNull('payments.supplier_id')
             ->whereRaw("$happenedAt >= ?", [$shift->opened_at])
             ->whereRaw("$happenedAt <= ?", [$until])
             ->selectRaw("payments.method, payments.direction, $source as source, sum(payments.amount) as total")
