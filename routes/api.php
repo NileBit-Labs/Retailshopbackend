@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PosCatalogController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\RefundController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShopController;
@@ -37,6 +39,8 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('shop.access')->group(function () {
         Route::get('/pos/products', [PosCatalogController::class, 'index']);
+
+        Route::get('/dashboard', [DashboardController::class, 'show']);
 
         Route::get('/sales', [SaleController::class, 'index']);
         Route::post('/sales', [SaleController::class, 'store']);
@@ -95,6 +99,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/purchases', [PurchaseController::class, 'store']);
         Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
         Route::post('/purchases/{purchase}/cancel', [PurchaseController::class, 'cancel']);
+
+        Route::get('/reports/overview', [ReportController::class, 'overview']);
+        Route::get('/reports/products', [ReportController::class, 'products']);
+        Route::get('/reports/balances', [ReportController::class, 'balances']);
 
         Route::get('/expenses', [ExpenseController::class, 'index']);
         Route::post('/expenses', [ExpenseController::class, 'store']);
