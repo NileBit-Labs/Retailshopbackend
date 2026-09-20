@@ -320,14 +320,20 @@ class StockDebtDashboardReportTest extends TestCase
 
     public function test_the_dashboard_shows_stock_and_debt_warnings(): void
     {
-        $this->productWithStock($this->shop, $this->owner, price: 1000, stock: 0);
-        $this->productWithStock($this->shop, $this->owner, stock: 2, attributes: ['low_stock_threshold' => 5]);
+        $this->productWithStock($this->shop, $this->owner, price: 1000, stock: 0, attributes: ['name' => 'Gone']);
+        $this->productWithStock($this->shop, $this->owner, stock: 2, attributes: ['name' => 'Nearly gone', 'low_stock_threshold' => 5]);
+        $this->productWithStock($this->shop, $this->owner, stock: 1, attributes: ['name' => 'Almost', 'low_stock_threshold' => 5]);
+        $this->productWithStock($this->shop, $this->owner, stock: 50, attributes: ['name' => 'Plenty', 'low_stock_threshold' => 5]);
         $product = $this->productWithStock($this->shop, $this->owner, price: 1000, stock: 50);
         $this->creditSale($this->owner, $this->customer('Owes'), $product->id, 4, 1000, null, ['due_date' => '2020-01-01']);
 
         $this->api($this->owner)->getJson('/api/reports/dashboard')
-            ->assertJsonPath('stock.out', 1)->assertJsonPath('stock.low', 1)
-            ->assertJsonPath('debt.total_owed', 3000)->assertJsonPath('debt.customers_owing', 1)->assertJsonPath('debt.overdue', 3000);
+            ->assertJsonPath('stock.out', 1)->assertJsonPath('stock.low', 2)
+            // What to reorder, worst first: the one that is gone, then the lowest.
+            ->assertJsonPath('stock.attention.0.name', 'Gone')->assertJsonPath('stock.attention.1.name', 'Almost')->assertJsonPath('stock.attention.2.name', 'Nearly gone')
+            ->assertJsonCount(3, 'stock.attention')
+            ->assertJsonPath('debt.total_owed', 3000)->assertJsonPath('debt.customers_owing', 1)->assertJsonPath('debt.overdue', 3000)
+            ->assertJsonPath('debt.top.0.name', 'Owes')->assertJsonPath('debt.top.0.balance', 3000)->assertJsonPath('debt.top.0.overdue', 3000);
     }
 
     public function test_the_dashboard_is_scoped_to_the_shop(): void

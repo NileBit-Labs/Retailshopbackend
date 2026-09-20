@@ -21,10 +21,25 @@ class StockReport
 
     public function __construct(private StockService $stock) {}
 
-    /** @return array<string, int> */
-    public function counts(Shop $shop): array
+    /**
+     * The dashboard's view: how many products are out or low, and the ones
+     * most in need of reordering (out first, then the lowest).
+     *
+     * @return array<string, mixed>
+     */
+    public function glance(Shop $shop, int $limit = 5): array
     {
-        return $this->countRows($this->rows($shop));
+        $rows = $this->rows($shop);
+
+        $needing = array_values(array_filter($rows, fn ($r) => $r['status'] !== 'ok'));
+        usort($needing, fn ($a, $b) => [$a['status'] === 'out' ? 0 : 1, $a['stock'], $a['name']] <=> [$b['status'] === 'out' ? 0 : 1, $b['stock'], $b['name']]);
+
+        return $this->countRows($rows) + [
+            'attention' => array_map(
+                fn ($r) => array_intersect_key($r, array_flip(['id', 'name', 'unit', 'stock', 'low_stock_level', 'status'])),
+                array_slice($needing, 0, $limit),
+            ),
+        ];
     }
 
     /**

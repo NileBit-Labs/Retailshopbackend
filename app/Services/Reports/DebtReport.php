@@ -25,15 +25,20 @@ class DebtReport
 
     public function __construct(private CustomerDebt $debt) {}
 
-    /** @return array{total_owed: int, customers_owing: int, overdue: int} */
-    public function totals(Shop $shop): array
+    /**
+     * The dashboard's view: the totals and the biggest debtors to chase.
+     *
+     * @return array<string, mixed>
+     */
+    public function glance(Shop $shop, int $limit = 4): array
     {
         $report = $this->report($shop);
 
-        return [
-            'total_owed' => $report['summary']['total_owed'],
-            'customers_owing' => $report['summary']['customers_owing'],
-            'overdue' => $report['summary']['overdue'],
+        return $report['summary'] + [
+            'top' => array_map(
+                fn ($c) => array_intersect_key($c, array_flip(['id', 'name', 'balance', 'overdue', 'days_overdue'])),
+                array_slice($report['customers'], 0, $limit),
+            ),
         ];
     }
 

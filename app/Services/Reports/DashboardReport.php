@@ -71,8 +71,8 @@ class DashboardReport
             'series' => array_map(fn ($d) => ['date' => $d['date'], 'net_sales' => $d['net_sales'], 'sales_count' => $d['sales_count']], $lastWeek),
             'top_products' => $top,
             'payment_methods' => $this->sales->paymentMethods($shop, $today),
-            'stock' => $this->stock->counts($shop),
-            'debt' => $this->debt->totals($shop),
+            'stock' => $this->stock->glance($shop),
+            'debt' => $this->debt->glance($shop),
             'recent_sales' => $this->recentSales($shop, null),
         ];
     }
