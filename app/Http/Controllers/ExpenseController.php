@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Expense;
 use App\Services\AuditLogger;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,8 +15,9 @@ class ExpenseController extends Controller
     {
         $shop = $request->attributes->get('shop');
 
-        $from = $request->filled('from') ? $request->date('from') : now()->startOfMonth();
-        $to = $request->filled('to') ? $request->date('to') : now();
+        $today = Carbon::parse($shop->today());
+        $from = $request->filled('from') ? $request->date('from') : $today->copy()->startOfMonth();
+        $to = $request->filled('to') ? $request->date('to') : $today;
 
         $query = Expense::where('shop_id', $shop->id)
             ->whereBetween('expense_date', [$from->toDateString(), $to->toDateString()]);
@@ -73,7 +75,7 @@ class ExpenseController extends Controller
             'category' => [$required, 'string', 'max:100'],
             'amount' => [$required, 'integer', 'min:1', 'max:1000000000000'],
             'description' => ['nullable', 'string', 'max:500'],
-            'expense_date' => [$required, 'date', 'before_or_equal:today'],
+            'expense_date' => [$required, 'date', 'before_or_equal:'.$request->attributes->get('shop')->today()],
         ]);
     }
 }

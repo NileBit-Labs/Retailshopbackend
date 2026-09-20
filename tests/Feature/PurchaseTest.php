@@ -11,6 +11,7 @@ use App\Models\Purchase;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Services\StockService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesShops;
 use Tests\TestCase;
@@ -282,6 +283,23 @@ class PurchaseTest extends TestCase
 
         $this->assertSame(1000, $product->fresh()->current_cost);
         $this->assertSame(10.0, $this->stock($product));
+    }
+
+    public function test_just_after_midnight_in_kampala_todays_date_is_accepted_even_though_utc_is_still_yesterday(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $product = $this->productWithStock($shop, $owner, stock: 0);
+        $item = [['product_id' => $product->id, 'quantity' => 1, 'unit_cost' => 500]];
+
+        // 00:30 on the 21st in Kampala is 21:30 on the 20th in UTC.
+        $this->travelTo(Carbon::parse('2026-09-21 00:30:00', 'Africa/Kampala'));
+
+        $this->receive($owner, $shop, $this->supplier($shop), $item, ['purchase_date' => '2026-09-21'])
+            ->assertCreated()->assertJsonPath('purchase_date', '2026-09-21');
+        $this->receive($owner, $shop, $this->supplier($shop, 'Second'), $item)
+            ->assertCreated()->assertJsonPath('purchase_date', '2026-09-21');
+        $this->receive($owner, $shop, $this->supplier($shop, 'Third'), $item, ['purchase_date' => '2026-09-22'])
+            ->assertUnprocessable()->assertJsonValidationErrors('purchase_date');
     }
 
     public function test_a_cancelled_purchase_cannot_be_cancelled_again(): void
