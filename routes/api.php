@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AskController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\CategoryController;
@@ -105,6 +106,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/expenses', [ExpenseController::class, 'index']);
         Route::post('/expenses', [ExpenseController::class, 'store']);
         Route::patch('/expenses/{expense}', [ExpenseController::class, 'update']);
+
+        Route::get('/ask/status', [AskController::class, 'status']);
+        Route::post('/ask', [AskController::class, 'ask'])->middleware('throttle:ask');
 
         Route::get('/reports/sales', [ReportController::class, 'sales']);
         Route::get('/reports/stock', [ReportController::class, 'stock']);
