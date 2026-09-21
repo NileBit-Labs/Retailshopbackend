@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Http\Requests\StoreSaleRequest;
 use App\Models\Sale;
 use App\Services\SaleService;
+use App\Support\PerPage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -47,7 +48,7 @@ class SaleController extends Controller
             $query->where('created_at', '<=', $request->date('to')->endOfDay());
         }
 
-        return $query->paginate(25);
+        return $query->paginate(PerPage::from($request, 25));
     }
 
     public function show(Request $request, int $sale): JsonResponse

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Services\ProductService;
 use App\Support\ManagedProductPresenter;
+use App\Support\PerPage;
 use App\Support\ProductRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class ProductController extends Controller
             $query->whereRaw("$stockSql <= 0");
         }
 
-        return response()->json($query->paginate(50)->through(fn (Product $p) => ManagedProductPresenter::format($p)));
+        return response()->json($query->paginate(PerPage::from($request))->through(fn (Product $p) => ManagedProductPresenter::format($p)));
     }
 
     public function store(Request $request, ProductService $products): JsonResponse
