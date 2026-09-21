@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\Purchase;
 use App\Services\PurchaseService;
 use App\Services\SupplierDebt;
+use App\Support\PerPage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -47,7 +48,7 @@ class PurchaseController extends Controller
                 ->orWhereRaw('lower(coalesce(reference, \'\')) like ?', [$like]));
         }
 
-        $page = $query->paginate(50);
+        $page = $query->paginate(PerPage::from($request));
         $open = $debt->openPurchases($page->getCollection()->pluck('supplier_id')->unique()->values()->all());
 
         return response()->json($page->through(fn (Purchase $p) => $this->format($p, $this->owed($p, $open))));

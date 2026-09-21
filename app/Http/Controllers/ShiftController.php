@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\Role;
 use App\Models\Shift;
 use App\Services\ShiftService;
+use App\Support\PerPage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -50,7 +51,7 @@ class ShiftController extends Controller
             $query->where('cashier_id', $request->user()->id);
         }
 
-        return response()->json($query->paginate(25)->through(fn (Shift $s) => $this->hideCounts($request, $s)->toArray()));
+        return response()->json($query->paginate(PerPage::from($request, 25))->through(fn (Shift $s) => $this->hideCounts($request, $s)->toArray()));
     }
 
     public function show(Request $request, ShiftService $shifts, int $shift): JsonResponse

@@ -8,6 +8,7 @@ use App\Models\SupplierLedgerEntry;
 use App\Services\AuditLogger;
 use App\Services\PurchaseService;
 use App\Services\SupplierDebt;
+use App\Support\PerPage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -52,7 +53,7 @@ class SupplierController extends Controller
 
         return response()->json([
             'summary' => $summary,
-            'suppliers' => $query->paginate(50)->through(fn (Supplier $s) => $this->format($s)),
+            'suppliers' => $query->paginate(PerPage::from($request))->through(fn (Supplier $s) => $this->format($s)),
         ]);
     }
 
@@ -108,7 +109,7 @@ class SupplierController extends Controller
             ->join('users', 'users.id', '=', 'supplier_ledger_entries.recorded_by')
             ->select('supplier_ledger_entries.*', 'users.name as recorded_by_name')
             ->orderByDesc('supplier_ledger_entries.id')
-            ->paginate(50);
+            ->paginate(PerPage::from($request));
 
         return response()->json($page->through(fn ($e) => [
             'id' => $e->id,

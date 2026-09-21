@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Support\PerPage;
 use App\Support\ReportRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class AuditLogController extends Controller
             $query->where('user_id', (int) $request->query('user_id'));
         }
 
-        $page = $query->with('user:id,name')->orderByDesc('id')->paginate(50);
+        $page = $query->with('user:id,name')->orderByDesc('id')->paginate(PerPage::from($request));
 
         return response()->json([
             'range' => $range->toArray(),

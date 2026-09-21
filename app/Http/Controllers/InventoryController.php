@@ -10,6 +10,7 @@ use App\Models\Sale;
 use App\Models\StockMovement;
 use App\Services\InventoryService;
 use App\Support\ManagedProductPresenter;
+use App\Support\PerPage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -58,7 +59,7 @@ class InventoryController extends Controller
 
         return response()->json([
             'summary' => $summary,
-            'products' => $query->paginate(50)->through(fn (Product $p) => ManagedProductPresenter::format($p)),
+            'products' => $query->paginate(PerPage::from($request))->through(fn (Product $p) => ManagedProductPresenter::format($p)),
         ]);
     }
 
@@ -88,7 +89,7 @@ class InventoryController extends Controller
             $query->where('stock_movements.created_at', '<=', $request->date('to')->endOfDay());
         }
 
-        $page = $query->paginate(50);
+        $page = $query->paginate(PerPage::from($request));
         $labels = $this->referenceLabels($page->getCollection());
 
         return response()->json($page->through(fn ($m) => [
