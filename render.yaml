@@ -4,7 +4,7 @@ services:
     runtime: docker
     plan: starter
     healthCheckPath: /up
-    preDeployCommand: php artisan migrate --force
+    preDeployCommand: CACHE_STORE=file php artisan migrate --force --isolated --no-interaction
     envVars:
       - key: APP_ENV
         value: production
