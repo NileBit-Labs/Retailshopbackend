@@ -41,6 +41,9 @@ class AskController extends Controller
         $shop = $request->attributes->get('shop');
         $role = $request->attributes->get('shopRole');
         $started = microtime(true);
+
+        // Several round trips to Google can take longer than PHP's default 30 seconds.
+        set_time_limit(150);
         $question = trim($data['question']);
 
         try {

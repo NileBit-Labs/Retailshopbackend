@@ -22,6 +22,9 @@ class AskAgent
     /** Earlier turns of the conversation that are sent along, for follow-up questions. */
     public const HISTORY_TURNS = 8;
 
+    /** Past this many seconds the assistant stops looking things up and says so. */
+    public const MAX_SECONDS = 100;
+
     public function __construct(private GeminiClient $gemini, private ShopTools $tools) {}
 
     /**
@@ -45,7 +48,13 @@ class AskAgent
         $visuals = [];
         $usage = ['input' => 0, 'output' => 0];
 
+        $began = microtime(true);
+
         for ($round = 1; $round <= self::MAX_ROUNDS; $round++) {
+            if ($round > 1 && microtime(true) - $began > self::MAX_SECONDS) {
+                break;
+            }
+
             $response = $this->gemini->generate([
                 'systemInstruction' => ['parts' => [['text' => $this->instructions($shop, $role)]]],
                 'contents' => $contents,
@@ -73,8 +82,16 @@ class AskAgent
                     : $this->done($text, 'ok', $visuals, $used, $usage);
             }
 
-            // Sent back exactly as received, so anything the model needs to continue its thought survives.
-            $contents[] = ['role' => 'model', 'parts' => $parts];
+            // Sent back as received, so anything the model needs to continue its thought survives.
+            // One repair: a call with no arguments arrives as {} but PHP reads it as [], and
+            // Google rejects a list where it expects an object.
+            $contents[] = ['role' => 'model', 'parts' => array_map(function ($part) {
+                if (isset($part['functionCall']) && empty($part['functionCall']['args'])) {
+                    $part['functionCall']['args'] = new \stdClass;
+                }
+
+                return $part;
+            }, $parts)];
             $replies = [];
 
             foreach ($calls as $call) {

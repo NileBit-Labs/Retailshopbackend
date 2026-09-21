@@ -7,6 +7,14 @@ use Tests\TestCase;
 
 class AskCheckCommandTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['services.gemini.fallback_models' => [], 'services.gemini.retry_pause_ms' => 0]);
+        Http::preventStrayRequests();
+    }
+
     private function reply(array $parts): array
     {
         return ['candidates' => [['content' => ['role' => 'model', 'parts' => $parts]]]];

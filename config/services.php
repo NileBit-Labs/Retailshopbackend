@@ -33,9 +33,15 @@ return [
     // use a paid key.
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),
+        // Tried in order when the main model is overloaded or has been retired.
+        'fallback_models' => array_values(array_filter(array_map('trim', explode(',', (string) env('GEMINI_FALLBACK_MODELS', 'gemini-3.8-flash,gemini-3.5-flash,gemini-flash-latest'))))),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
         'timeout' => (int) env('GEMINI_TIMEOUT', 45),
+        // After this many seconds of failures, stop trying further models.
+        'budget_seconds' => (int) env('GEMINI_BUDGET_SECONDS', 45),
+        // The pause before trying an overloaded model a second time.
+        'retry_pause_ms' => (int) env('GEMINI_RETRY_PAUSE_MS', 900),
         // Questions one shop may ask per day, so a runaway script can't run up the bill.
         'daily_limit' => (int) env('ASK_DAILY_LIMIT', 200),
     ],

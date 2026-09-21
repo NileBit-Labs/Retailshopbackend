@@ -24,7 +24,8 @@ class AskTest extends TestCase
     {
         parent::setUp();
 
-        config(['services.gemini.key' => 'test-key', 'services.gemini.daily_limit' => 200]);
+        config(['services.gemini.key' => 'test-key', 'services.gemini.daily_limit' => 200, 'services.gemini.fallback_models' => [], 'services.gemini.retry_pause_ms' => 0]);
+        Http::preventStrayRequests();
         $this->travelTo(Carbon::parse('2026-09-21 10:00:00', 'Africa/Kampala'));
     }
 
@@ -249,6 +250,23 @@ class AskTest extends TestCase
         }
     }
 
+    public function test_a_tool_called_with_no_arguments_is_sent_back_as_an_object_not_a_list(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+
+        // Google sends "args": {} - PHP reads it as [] - and Google refuses a list when it is sent back.
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()
+            ->push(json_decode('{"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"get_customer_debts","args":{}}}]}}]}', true))
+            ->push($this->says('done')),
+        ]);
+
+        $this->ask($owner, $shop)->assertOk();
+
+        $second = Http::recorded()->all()[1][0]->body();
+        $this->assertStringContainsString('"args":{}', $second);
+        $this->assertStringNotContainsString('"args":[]', $second);
+    }
+
     public function test_a_model_that_never_stops_asking_is_cut_off(): void
     {
         [$owner, $shop] = $this->shopWithMember();
@@ -395,6 +413,7 @@ class AskTest extends TestCase
             Http::response(['error' => ['code' => 429, 'status' => 'RESOURCE_EXHAUSTED']], 429),
             Http::response(['error' => ['code' => 400, 'message' => 'API key not valid. Please pass a valid API key.', 'details' => [['reason' => 'API_KEY_INVALID']]]], 400),
             Http::response('down', 503),
+            Http::response('down', 503),
             'connection',
             Http::response(['error' => ['code' => 400, 'message' => 'Invalid JSON payload']], 400),
         ];
@@ -416,6 +435,72 @@ class AskTest extends TestCase
         $this->ask($owner, $shop)->assertStatus(502)->assertJsonPath('code', 'bad_request');
 
         $this->assertSame(5, AskQuery::where('status', 'error')->count());
+    }
+
+    /** @return array<int, string> the model names Google was asked, in order */
+    private function modelsAsked(): array
+    {
+        return array_map(fn ($pair) => preg_match('#/models/([^:]+):generateContent#', $pair[0]->url(), $m) ? $m[1] : '?', Http::recorded()->all());
+    }
+
+    public function test_an_overloaded_model_is_tried_once_more_before_giving_up(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        config(['services.gemini.model' => 'main-model']);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()->push('busy', 503)->push($this->says('Second try worked.'))]);
+
+        $this->ask($owner, $shop)->assertOk()->assertJsonPath('answer', 'Second try worked.');
+
+        $this->assertSame(['main-model', 'main-model'], $this->modelsAsked());
+    }
+
+    public function test_when_the_main_model_stays_overloaded_the_next_one_answers(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        config(['services.gemini.model' => 'main-model', 'services.gemini.fallback_models' => ['backup-1', 'backup-2']]);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()->push('busy', 503)->push('busy', 503)->push($this->says('The backup answered.'))]);
+
+        $this->ask($owner, $shop)->assertOk()->assertJsonPath('answer', 'The backup answered.')->assertJsonPath('status', 'ok');
+
+        $this->assertSame(['main-model', 'main-model', 'backup-1'], $this->modelsAsked());
+    }
+
+    public function test_a_retired_model_is_skipped_and_a_rate_limited_one_too(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        config(['services.gemini.model' => 'old-model', 'services.gemini.fallback_models' => ['limited', 'good']]);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()
+            ->push(['error' => ['code' => 404, 'status' => 'NOT_FOUND']], 404)
+            ->push(['error' => ['code' => 429, 'status' => 'RESOURCE_EXHAUSTED']], 429)
+            ->push($this->says('The third model answered.')),
+        ]);
+
+        $this->ask($owner, $shop)->assertOk()->assertJsonPath('answer', 'The third model answered.');
+
+        $this->assertSame(['old-model', 'limited', 'good'], $this->modelsAsked());
+    }
+
+    public function test_a_refused_key_or_bad_request_stops_at_once_instead_of_trying_every_model(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        config(['services.gemini.model' => 'main-model', 'services.gemini.fallback_models' => ['backup-1', 'backup-2']]);
+
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => ['code' => 403, 'status' => 'PERMISSION_DENIED']], 403)]);
+        $this->ask($owner, $shop)->assertStatus(502)->assertJsonPath('code', 'invalid_key');
+        $this->assertSame(['main-model'], $this->modelsAsked());
+    }
+
+    public function test_when_every_model_fails_the_person_is_told_what_to_fix(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        config(['services.gemini.model' => 'gone', 'services.gemini.fallback_models' => ['also-gone']]);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => ['code' => 404, 'status' => 'NOT_FOUND']], 404)]);
+
+        $response = $this->ask($owner, $shop)->assertStatus(502)->assertJsonPath('code', 'model_unavailable');
+
+        $this->assertStringContainsString('GEMINI_MODEL', $response->json('message'));
+        $this->assertSame(['gone', 'also-gone'], $this->modelsAsked());
+        $this->assertSame('model_unavailable', AskQuery::sole()->error);
     }
 
     public function test_a_blocked_or_empty_reply_gets_a_polite_answer(): void

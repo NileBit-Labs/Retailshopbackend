@@ -19,8 +19,7 @@ class AskCheck extends Command
 
     public function handle(GeminiClient $gemini): int
     {
-        $model = config('services.gemini.model');
-        $this->line("Model: {$model}");
+        $this->line('Models (in order): '.implode(', ', $gemini->models()));
 
         if (! $gemini->enabled()) {
             $this->error('No GEMINI_API_KEY is set. Add it to the backend .env file, then run this again.');
@@ -31,7 +30,7 @@ class AskCheck extends Command
         try {
             $hello = $gemini->generate(['contents' => [['role' => 'user', 'parts' => [['text' => 'Reply with the single word: OK']]]]]);
             $said = $this->text($hello['candidates'][0]['content']['parts'] ?? []);
-            $this->info('1/2  The key and model work. The AI said: '.($said === '' ? '(nothing)' : trim($said)));
+            $this->info('1/2  The key works. The AI said: '.($said === '' ? '(nothing)' : trim($said))."  [answered by {$gemini->lastModel}]");
 
             $tool = ['functionDeclarations' => [[
                 'name' => 'get_lucky_number',
@@ -65,7 +64,7 @@ class AskCheck extends Command
                 return self::FAILURE;
             }
 
-            $this->info('2/2  Tool calling works end to end. Ask Your Shop is ready to use.');
+            $this->info("2/2  Tool calling works end to end [answered by {$gemini->lastModel}]. Ask Your Shop is ready to use.");
 
             return self::SUCCESS;
         } catch (AskException $e) {
