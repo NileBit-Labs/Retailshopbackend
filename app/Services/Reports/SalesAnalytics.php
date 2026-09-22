@@ -117,6 +117,19 @@ class SalesAnalytics
     {
         return DB::table('payments')->where('shop_id', $shop->id)
             ->whereBetween('created_at', [$range->utcFrom(), $range->utcTo()])
+            // Sales, refunds and voids always refer to their sale. Customer
+            // repayments have no sale because they are applied across the
+            // customer's oldest debts. Supplier and purchase payments share
+            // this append-only table, but are business outgoings rather than
+            // retail-sale payment methods and must not alter this split.
+            ->where(function (Builder $query) {
+                $query->whereNotNull('sale_id')
+                    ->orWhere(function (Builder $query) {
+                        $query->whereNotNull('customer_id')
+                            ->whereNull('supplier_id')
+                            ->whereNull('purchase_id');
+                    });
+            })
             ->selectRaw("method, SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END) as amount")
             ->groupBy('method')->orderByDesc('amount')->get()
             ->map(fn ($row) => ['method' => $row->method, 'amount' => (int) $row->amount])

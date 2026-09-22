@@ -6,6 +6,7 @@ use App\Enums\MovementType;
 use App\Enums\Role;
 use App\Models\Sale;
 use App\Models\StockMovement;
+use App\Models\SyncEvent;
 use App\Services\StockService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesShops;
@@ -68,6 +69,9 @@ class SyncTest extends TestCase
         $this->assertDatabaseCount('sales', 1);
         $this->assertDatabaseCount('payments', 1);
         $this->assertSame(1, StockMovement::where('movement_type', 'SALE')->count());
+        $record = SyncEvent::sole();
+        $this->assertSame('processed', $record->status);
+        $this->assertSame(Sale::firstOrFail()->id, $record->result['sale_id']);
         $this->assertEquals(7.0, app(StockService::class)->current($shop->id, $product->id));
     }
 

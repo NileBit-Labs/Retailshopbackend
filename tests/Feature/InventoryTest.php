@@ -42,6 +42,17 @@ class InventoryTest extends TestCase
         $this->assertSame($owner->id, StockMovement::where('movement_type', 'ADJUSTMENT')->firstOrFail()->performed_by);
     }
 
+    public function test_stock_movement_belongs_to_its_product_shop_and_performer(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $product = $this->productWithStock($shop, $owner, stock: 3);
+        $movement = StockMovement::where('product_id', $product->id)->sole();
+
+        $this->assertTrue($movement->product->is($product));
+        $this->assertTrue($movement->shop->is($shop));
+        $this->assertTrue($movement->performer->is($owner));
+    }
+
     public function test_an_adjustment_can_add_stock_and_a_count_that_matches_is_rejected(): void
     {
         [$owner, $shop] = $this->shopWithMember();

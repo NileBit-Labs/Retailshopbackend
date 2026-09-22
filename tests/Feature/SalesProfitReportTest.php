@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\Refund;
 use App\Models\Sale;
 use App\Models\Shop;
+use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -187,6 +188,34 @@ class SalesProfitReportTest extends TestCase
         // Cash in 5,500 + 1,900 + 1,000; out 1,000 (void) + 1,000 (refund). Mobile money in 1,000, out 1,000.
         $this->assertSame(6400, $methods['CASH']);
         $this->assertSame(0, $methods['MOBILE_MONEY']);
+    }
+
+    public function test_supplier_payments_do_not_reduce_the_retail_cash_payment_split(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $saleProduct = $this->productWithStock($shop, $owner, price: 10000, stock: 1);
+        $purchaseProduct = $this->productWithStock($shop, $owner, stock: 0);
+        $supplier = Supplier::create(['shop_id' => $shop->id, 'name' => 'Kampala Wholesale']);
+
+        $this->api($owner, $shop)->postJson('/api/sales', [
+            'items' => [['product_id' => $saleProduct->id, 'quantity' => 1]],
+            'payments' => [['method' => 'CASH', 'amount' => 10000]],
+        ])->assertCreated();
+
+        $this->api($owner, $shop)->postJson('/api/purchases', [
+            'supplier_id' => $supplier->id,
+            'items' => [['product_id' => $purchaseProduct->id, 'quantity' => 1, 'unit_cost' => 6000]],
+            'amount_paid' => 6000,
+            'payment_method' => 'CASH',
+        ])->assertCreated();
+
+        $salesMethods = collect($this->api($owner, $shop)->getJson('/api/reports/sales')->assertOk()->json('payment_methods'))
+            ->pluck('amount', 'method');
+        $dashboardMethods = collect($this->api($owner, $shop)->getJson('/api/reports/dashboard')->assertOk()->json('payment_methods'))
+            ->pluck('amount', 'method');
+
+        $this->assertSame(10000, $salesMethods['CASH']);
+        $this->assertSame(10000, $dashboardMethods['CASH']);
     }
 
     public function test_the_sales_report_only_shows_this_shops_data(): void
