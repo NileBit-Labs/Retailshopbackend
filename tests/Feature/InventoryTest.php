@@ -2,17 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Enums\MovementType;
 use App\Enums\Role;
 use App\Models\AuditLog;
-use App\Models\Organization;
 use App\Models\Product;
-use Tests\Concerns\CreatesShops;
-use App\Models\Shop;
 use App\Models\StockMovement;
-use App\Models\User;
-use App\Models\UserShopRole;
+use App\Services\StockService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\CreatesShops;
 use Tests\TestCase;
 
 class InventoryTest extends TestCase

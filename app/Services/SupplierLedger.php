@@ -2,32 +2,37 @@
 
 namespace App\Services;
 
-use App\Enums\SupplierLedgerType;
 use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 
 class SupplierLedger
 {
+    public const PURCHASE = 'PURCHASE';
+
+    public const PAYMENT = 'PAYMENT';
+
+    public const PURCHASE_CANCEL = 'PURCHASE_CANCEL';
+
     public function balance(Supplier $supplier): int
     {
         return (int) SupplierLedgerEntry::query()
             ->where('supplier_id', $supplier->id)
-            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount WHEN type IN (?, ?) THEN -amount ELSE amount END), 0) as balance', [
-                SupplierLedgerType::PurchaseCredit->value,
-                SupplierLedgerType::Payment->value,
-                SupplierLedgerType::Return->value,
-            ])->value('balance');
+            ->sum('amount');
     }
 
-    public function payment(Supplier $supplier, int $amount, User $by, ?string $reference = null, ?string $notes = null): SupplierLedgerEntry
+    /** Positive amounts increase what the shop owes; negative amounts reduce it. */
+    public function record(Supplier $supplier, string $type, int $amount, User $by, ?Model $reference = null, ?string $note = null): SupplierLedgerEntry
     {
         return SupplierLedgerEntry::create([
+            'shop_id' => $supplier->shop_id,
             'supplier_id' => $supplier->id,
-            'type' => SupplierLedgerType::Payment,
+            'type' => $type,
             'amount' => $amount,
-            'reference' => $reference,
-            'notes' => $notes,
+            'reference_type' => $reference ? $reference::class : null,
+            'reference_id' => $reference?->getKey(),
+            'note' => $note,
             'recorded_by' => $by->id,
         ]);
     }
