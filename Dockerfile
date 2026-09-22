@@ -1,4 +1,8 @@
-FROM composer:2 AS vendor
+FROM php:8.4-fpm-bookworm AS vendor
+RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev libzip-dev unzip \
+    && docker-php-ext-install pdo_pgsql zip \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
