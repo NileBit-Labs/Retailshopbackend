@@ -7,10 +7,6 @@ use App\Models\SupplierLedgerEntry;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
-/**
- * The only writer of supplier balances. A balance is never stored: it is the
- * sum of the append-only ledger, so it can always be re-derived and audited.
- */
 class SupplierLedger
 {
     public const PURCHASE = 'PURCHASE';
@@ -21,10 +17,12 @@ class SupplierLedger
 
     public function balance(Supplier $supplier): int
     {
-        return (int) SupplierLedgerEntry::where('supplier_id', $supplier->id)->sum('amount');
+        return (int) SupplierLedgerEntry::query()
+            ->where('supplier_id', $supplier->id)
+            ->sum('amount');
     }
 
-    /** @param  int  $amount  positive = the shop owes more, negative = it owes less */
+    /** Positive amounts increase what the shop owes; negative amounts reduce it. */
     public function record(Supplier $supplier, string $type, int $amount, User $by, ?Model $reference = null, ?string $note = null): SupplierLedgerEntry
     {
         return SupplierLedgerEntry::create([
