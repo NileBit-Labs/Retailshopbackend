@@ -22,4 +22,14 @@ class StockMovement extends Model
             'movement_type' => MovementType::class,
         ];
     }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function performer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'performed_by');
+    }
 }

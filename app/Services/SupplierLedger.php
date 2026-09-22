@@ -2,39 +2,32 @@
 
 namespace App\Services;
 
+use App\Enums\SupplierLedgerType;
 use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Model;
 
-/**
- * The only writer of supplier balances. A balance is never stored: it is the
- * sum of the append-only ledger, so it can always be re-derived and audited.
- */
 class SupplierLedger
 {
-    public const PURCHASE = 'PURCHASE';
-
-    public const PAYMENT = 'PAYMENT';
-
-    public const PURCHASE_CANCEL = 'PURCHASE_CANCEL';
-
     public function balance(Supplier $supplier): int
     {
-        return (int) SupplierLedgerEntry::where('supplier_id', $supplier->id)->sum('amount');
+        return (int) SupplierLedgerEntry::query()
+            ->where('supplier_id', $supplier->id)
+            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount WHEN type IN (?, ?) THEN -amount ELSE amount END), 0) as balance', [
+                SupplierLedgerType::PurchaseCredit->value,
+                SupplierLedgerType::Payment->value,
+                SupplierLedgerType::Return->value,
+            ])->value('balance');
     }
 
-    /** @param  int  $amount  positive = the shop owes more, negative = it owes less */
-    public function record(Supplier $supplier, string $type, int $amount, User $by, ?Model $reference = null, ?string $note = null): SupplierLedgerEntry
+    public function payment(Supplier $supplier, int $amount, User $by, ?string $reference = null, ?string $notes = null): SupplierLedgerEntry
     {
         return SupplierLedgerEntry::create([
-            'shop_id' => $supplier->shop_id,
             'supplier_id' => $supplier->id,
-            'type' => $type,
+            'type' => SupplierLedgerType::Payment,
             'amount' => $amount,
-            'reference_type' => $reference ? $reference::class : null,
-            'reference_id' => $reference?->getKey(),
-            'note' => $note,
+            'reference' => $reference,
+            'notes' => $notes,
             'recorded_by' => $by->id,
         ]);
     }
