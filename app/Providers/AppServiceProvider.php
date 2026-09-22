@@ -22,6 +22,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Login attempts are scoped to the email and source IP so one shop's
+        // typo does not lock out every person behind a shared connection.
+        RateLimiter::for('login', fn (Request $request) => Limit::perMinute(5)
+            ->by(strtolower((string) $request->input('email')).'|'.$request->ip()));
+
+        // Account creation is a higher-risk public endpoint. Keep it modest
+        // even when a future environment intentionally enables it.
+        RateLimiter::for('registration', fn (Request $request) => Limit::perHour(3)
+            ->by($request->ip()));
+
         // A person asking the AI questions in a burst is fine; a script hammering it is not.
         RateLimiter::for('ask', fn (Request $request) => Limit::perMinute(12)->by($request->user()?->id ?: $request->ip()));
     }

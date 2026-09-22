@@ -14,6 +14,12 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
+        abort_unless(
+            config('beta.public_registration'),
+            403,
+            'Public registration is currently closed. Please contact NileBit Labs for an invitation.',
+        );
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],

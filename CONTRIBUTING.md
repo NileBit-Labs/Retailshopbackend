@@ -1,6 +1,6 @@
 # Contributing to retailbackend
 
-Laravel API for NileBit Retail POS. PostgreSQL for local dev, Sanctum for API auth.
+Laravel API for NileBit POS for Retail. PostgreSQL for local dev, Sanctum for API auth.
 
 ## Setup
 
