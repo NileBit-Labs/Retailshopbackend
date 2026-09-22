@@ -1,5 +1,18 @@
 # NileBit POS for Retail private beta
 
+## Render free public beta
+
+This is a free, invite-only public beta limited to 30 days. The Render free
+PostgreSQL database expires after 30 days and has no backups. Export the data
+before the expiry deadline or upgrade the database before the beta ends.
+
+For this free deployment, set `RUN_MIGRATIONS_ON_BOOT=true` in Render. The
+container then runs `php artisan migrate --force --no-interaction` before the
+application starts. This replaces Render's paid-only pre-deploy command.
+
+For a paid production deployment, set `RUN_MIGRATIONS_ON_BOOT=false` and run
+the migration as a Render pre-deploy command instead.
+
 Public self-registration is disabled in production. Existing invited users can
 continue to sign in and access only the shops assigned to them.
 

@@ -2,9 +2,8 @@ services:
   - type: web
     name: nilebit-retail-api
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /up
-    preDeployCommand: CACHE_STORE=file php artisan migrate --force --isolated --no-interaction
     envVars:
       - key: APP_ENV
         value: production
@@ -32,8 +31,10 @@ services:
         value: database
       - key: QUEUE_CONNECTION
         value: database
+      - key: RUN_MIGRATIONS_ON_BOOT
+        value: "true"
       - key: GEMINI_API_KEY
         sync: false
 databases:
   - name: nilebit-retail-db
-    plan: basic-256mb
+    plan: free
