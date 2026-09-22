@@ -19,6 +19,8 @@ services:
         fromDatabase:
           name: nilebit-retail-db
           property: connectionString
+      - key: DB_CONNECTION
+        value: pgsql
       - key: DB_SSLMODE
         value: require
       - key: LOG_CHANNEL
