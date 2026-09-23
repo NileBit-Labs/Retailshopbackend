@@ -50,8 +50,16 @@ class AskCheck extends Command
                 return self::FAILURE;
             }
 
+            $callId = $call['functionCall']['id'] ?? null;
+            if (! is_string($callId) || $callId === '') {
+                $this->warn('2/2  The AI returned a tool call without an ID. The response is not compatible with this model.');
+
+                return self::FAILURE;
+            }
+
             $contents[] = ['role' => 'model', 'parts' => $parts];
             $answer = ['functionResponse' => [
+                'id' => $callId,
                 'name' => $call['functionCall']['name'],
                 'response' => ['result' => ['lucky_number' => 4217]],
             ]];

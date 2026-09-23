@@ -27,7 +27,7 @@ class AskCheckCommandTest extends TestCase
         config(['services.gemini.key' => 'super-secret-key']);
         Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()
             ->push($this->reply([['text' => 'OK']]))
-            ->push($this->reply([['functionCall' => ['name' => 'get_lucky_number', 'args' => ['shop' => 'x']]]]))
+            ->push($this->reply([['functionCall' => ['id' => 'check-call', 'name' => 'get_lucky_number', 'args' => ['shop' => 'x']]]]))
             ->push($this->reply([['text' => 'The lucky number is 4217.']])),
         ]);
 
@@ -51,5 +51,16 @@ class AskCheckCommandTest extends TestCase
         ]);
 
         $this->artisan('ask:check')->expectsOutputToContain('without using the tool')->assertFailed();
+    }
+
+    public function test_it_fails_when_a_tool_call_has_no_id(): void
+    {
+        config(['services.gemini.key' => 'k']);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()
+            ->push($this->reply([['text' => 'OK']]))
+            ->push($this->reply([['functionCall' => ['name' => 'get_lucky_number', 'args' => []]]])),
+        ]);
+
+        $this->artisan('ask:check')->expectsOutputToContain('without an ID')->assertFailed();
     }
 }

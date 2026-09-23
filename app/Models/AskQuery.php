@@ -10,11 +10,11 @@ class AskQuery extends Model
 
     protected $fillable = [
         'shop_id', 'user_id', 'question', 'answer', 'tools', 'input_tokens', 'output_tokens',
-        'duration_ms', 'status', 'error',
+        'duration_ms', 'status', 'error', 'counts_toward_limit',
     ];
 
     protected function casts(): array
     {
-        return ['tools' => 'array'];
+        return ['tools' => 'array', 'counts_toward_limit' => 'boolean'];
     }
 }

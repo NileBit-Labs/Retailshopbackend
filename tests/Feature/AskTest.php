@@ -42,7 +42,7 @@ class AskTest extends TestCase
     private function wants(array $calls): array
     {
         return [
-            'candidates' => [['content' => ['role' => 'model', 'parts' => array_map(fn ($c) => ['functionCall' => ['name' => $c[0], 'args' => $c[1] ?? []]], $calls)], 'finishReason' => 'STOP']],
+            'candidates' => [['content' => ['role' => 'model', 'parts' => array_map(fn ($c, $i) => ['functionCall' => ['id' => "call-{$i}", 'name' => $c[0], 'args' => $c[1] ?? []]], $calls, array_keys($calls))], 'finishReason' => 'STOP']],
             'usageMetadata' => ['promptTokenCount' => 120, 'candidatesTokenCount' => 30],
         ];
     }
@@ -138,7 +138,7 @@ class AskTest extends TestCase
         [$owner, $shop] = $this->shopWithMember();
         [$manager] = $this->shopWithMember(Role::Manager, $shop);
 
-        $this->fake($this->says('a'), $this->says('b'));
+        $this->fake($this->says("I can't answer that without checking the shop records."), $this->says("I can't answer that without checking the shop records."));
         $this->ask($owner, $shop)->assertOk();
         $this->ask($manager, $shop)->assertOk();
 
@@ -155,7 +155,7 @@ class AskTest extends TestCase
         $product = $this->productWithStock($shop, $owner, price: 1000, cost: 600, stock: 50);
         $this->sell($owner, $shop, $product, 4);
 
-        $this->fake($this->wants([['get_profit_summary', ['period' => 'today']], ['get_top_products', ['sort_by' => 'profit', 'period' => 'today']], ['get_product_performance', ['name' => $product->name, 'period' => 'today']]]), $this->says('I cannot show profit.'));
+        $this->fake($this->wants([['get_profit_summary', ['period' => 'today']], ['get_top_products', ['sort_by' => 'profit', 'period' => 'today']], ['get_product_performance', ['name' => $product->name, 'period' => 'today']], ['find_product', ['name' => $product->name]], ['get_stock_status', []]]), $this->says('I cannot show profit.'));
 
         $this->ask($manager, $shop)->assertOk();
 
@@ -167,6 +167,9 @@ class AskTest extends TestCase
         $this->assertSame(4000, $results['get_product_performance']['matches'][0]['revenue']);
         $this->assertArrayNotHasKey('profit', $results['get_product_performance']['matches'][0]);
         $this->assertArrayNotHasKey('cost', $results['get_product_performance']['matches'][0]);
+        $this->assertArrayNotHasKey('cost_price', $results['find_product']['matches'][0]);
+        $this->assertArrayNotHasKey('margin_percent', $results['find_product']['matches'][0]);
+        $this->assertArrayNotHasKey('value_at_cost', $results['get_stock_status']['summary']);
     }
 
     public function test_the_owner_gets_profit_worked_out_from_what_the_goods_cost_when_sold(): void
@@ -238,9 +241,9 @@ class AskTest extends TestCase
             ['get_sales_summary', ['from' => '2020-01-01', 'to' => '2026-09-21']],
             ['find_product', ['name' => 'x']],
             ['no_such_tool', []],
-        ]), $this->says('Sorry, could you say the dates again?'));
+        ]), $this->says('Please clarify the dates you want to check.'));
 
-        $this->ask($owner, $shop)->assertOk()->assertJsonPath('answer', 'Sorry, could you say the dates again?');
+        $this->ask($owner, $shop)->assertOk()->assertJsonPath('status', 'blocked');
 
         $blocks = end($this->sent()[1]['contents'])['parts'];
         $this->assertCount(8, $blocks);
@@ -268,7 +271,7 @@ class AskTest extends TestCase
             $history[] = ['role' => $i % 2 ? 'user' : 'assistant', 'text' => "turn {$i}"];
         }
 
-        $this->fake($this->says('ok'));
+        $this->fake($this->says('Please clarify what you want to compare.'));
         $this->ask($owner, $shop, 'and last week?', ['history' => $history])->assertOk();
 
         $contents = $this->sent()[0]['contents'];
@@ -296,7 +299,7 @@ class AskTest extends TestCase
     {
         [$owner, $shop] = $this->shopWithMember();
 
-        $this->fake($this->says('x'));
+        $this->fake($this->says("I can't answer that without checking the shop records."));
         $this->ask($owner, $shop)->assertOk();
 
         $prompt = $this->sent()[0]['systemInstruction']['parts'][0]['text'];
@@ -348,7 +351,7 @@ class AskTest extends TestCase
     public function test_the_key_goes_in_a_header_never_in_the_address_or_the_reply(): void
     {
         [$owner, $shop] = $this->shopWithMember();
-        $this->fake($this->says('hi'));
+        $this->fake($this->says("I can't answer that without checking the shop records."));
 
         $response = $this->ask($owner, $shop)->assertOk();
 
@@ -361,14 +364,18 @@ class AskTest extends TestCase
     {
         [$owner, $shop] = $this->shopWithMember();
         config(['services.gemini.daily_limit' => 2]);
-        $this->fake($this->says('one'), $this->says('two'));
+        $this->fake(
+            $this->wants([['get_stock_status', []]]), $this->says('one'),
+            $this->wants([['get_stock_status', []]]), $this->says('two'),
+        );
 
         $this->ask($owner, $shop)->assertOk();
         $this->ask($owner, $shop)->assertOk();
         $this->ask($owner, $shop)->assertStatus(429)->assertJsonPath('code', 'daily_limit');
 
-        Http::assertSentCount(2);
+        Http::assertSentCount(4);
         $this->api($owner, $shop)->getJson('/api/ask/status')->assertJsonPath('asked_today', 2)->assertJsonPath('daily_limit', 2);
+        $this->assertSame(2, AskQuery::where('counts_toward_limit', true)->count());
     }
 
     public function test_the_daily_limit_is_per_shop_and_resets_the_next_day(): void
@@ -376,7 +383,11 @@ class AskTest extends TestCase
         [$owner, $shop] = $this->shopWithMember();
         [$other, $otherShop] = $this->shopWithMember();
         config(['services.gemini.daily_limit' => 1]);
-        $this->fake($this->says('a'), $this->says('b'), $this->says('c'));
+        $this->fake(
+            $this->wants([['get_stock_status', []]]), $this->says('a'),
+            $this->wants([['get_stock_status', []]]), $this->says('b'),
+            $this->wants([['get_stock_status', []]]), $this->says('c'),
+        );
 
         $this->ask($owner, $shop)->assertOk();
         $this->ask($owner, $shop)->assertStatus(429);
@@ -396,6 +407,7 @@ class AskTest extends TestCase
             Http::response(['error' => ['code' => 400, 'message' => 'API key not valid. Please pass a valid API key.', 'details' => [['reason' => 'API_KEY_INVALID']]]], 400),
             Http::response('down', 503),
             'connection',
+            Http::response(['error' => ['code' => 404, 'status' => 'NOT_FOUND', 'message' => 'Model not found']], 404),
             Http::response(['error' => ['code' => 400, 'message' => 'Invalid JSON payload']], 400),
         ];
 
@@ -413,19 +425,81 @@ class AskTest extends TestCase
 
         $this->ask($owner, $shop)->assertStatus(503)->assertJsonPath('code', 'unavailable');
         $this->ask($owner, $shop)->assertStatus(503)->assertJsonPath('code', 'unavailable');
+        $this->ask($owner, $shop)->assertStatus(503)->assertJsonPath('code', 'model_unavailable');
         $this->ask($owner, $shop)->assertStatus(502)->assertJsonPath('code', 'bad_request');
 
-        $this->assertSame(5, AskQuery::where('status', 'error')->count());
+        $this->assertSame(6, AskQuery::where('status', 'error')->count());
+        $this->assertSame(0, AskQuery::where('counts_toward_limit', true)->count());
+        $this->api($owner, $shop)->getJson('/api/ask/status')->assertJsonPath('asked_today', 0);
     }
 
-    public function test_a_blocked_or_empty_reply_gets_a_polite_answer(): void
+    public function test_a_malformed_provider_reply_is_not_presented_as_a_success(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $this->fake(['candidates' => [['content' => []]]]);
+
+        $this->ask($owner, $shop)->assertStatus(502)->assertJsonPath('code', 'malformed_response');
+        $this->assertSame('malformed_response', AskQuery::sole()->error);
+        $this->assertFalse(AskQuery::sole()->counts_toward_limit);
+    }
+
+    public function test_a_function_call_without_an_id_is_rejected_as_malformed(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $this->fake([
+            'candidates' => [[
+                'content' => [
+                    'parts' => [['functionCall' => ['name' => 'get_stock_status', 'args' => []]]],
+                ],
+            ]],
+        ]);
+
+        $this->ask($owner, $shop)->assertStatus(502)->assertJsonPath('code', 'malformed_response');
+    }
+
+    public function test_function_results_echo_the_gemini_call_id(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $this->fake($this->wants([['get_stock_status', []]]), $this->says('done'));
+
+        $this->ask($owner, $shop)->assertOk();
+
+        $part = end($this->sent()[1]['contents'])['parts'][0]['functionResponse'];
+        $this->assertSame('call-0', $part['id']);
+        $this->assertSame('get_stock_status', $part['name']);
+    }
+
+    public function test_a_model_only_business_claim_is_rejected_and_does_not_use_the_daily_allowance(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $this->fake($this->says('You sold UGX 9,999 today.'));
+
+        $this->ask($owner, $shop)->assertStatus(502)->assertJsonPath('code', 'ungrounded_response');
+        $this->assertSame('ungrounded_response', AskQuery::sole()->error);
+        $this->assertFalse(AskQuery::sole()->counts_toward_limit);
+        $this->api($owner, $shop)->getJson('/api/ask/status')->assertJsonPath('asked_today', 0);
+    }
+
+    public function test_an_explicit_no_tool_unsupported_reply_is_safe_and_counts_as_an_accepted_provider_response(): void
+    {
+        [$owner, $shop] = $this->shopWithMember();
+        $this->fake($this->says("I can't answer questions about other shops."));
+
+        $this->ask($owner, $shop)->assertOk()
+            ->assertJsonPath('status', 'blocked')
+            ->assertJsonPath('answer', "I can't verify that from your shop records. I can help with sales, stock, customers, expenses, suppliers and owner-only profit.")
+            ->assertJsonCount(0, 'tools');
+        $this->assertTrue(AskQuery::sole()->counts_toward_limit);
+    }
+
+    public function test_a_provider_safety_block_is_accepted_but_an_empty_model_reply_is_rejected(): void
     {
         [$owner, $shop] = $this->shopWithMember();
 
         $this->fake(['promptFeedback' => ['blockReason' => 'SAFETY']], ['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => '   ']]]]]]);
 
         $this->ask($owner, $shop)->assertOk()->assertJsonPath('status', 'blocked');
-        $this->ask($owner, $shop)->assertOk()->assertJsonPath('status', 'incomplete');
+        $this->ask($owner, $shop)->assertStatus(502)->assertJsonPath('code', 'ungrounded_response');
     }
 
     public function test_every_question_is_recorded_with_what_it_looked_at_and_what_it_cost(): void
@@ -444,6 +518,7 @@ class AskTest extends TestCase
         $this->assertSame(320, $row->input_tokens);
         $this->assertSame(90, $row->output_tokens);
         $this->assertSame('ok', $row->status);
+        $this->assertTrue($row->counts_toward_limit);
     }
 
     public function test_questions_must_be_sensible(): void
@@ -462,7 +537,14 @@ class AskTest extends TestCase
     public function test_asking_in_a_burst_is_rate_limited(): void
     {
         [$owner, $shop] = $this->shopWithMember();
-        Http::fake(['generativelanguage.googleapis.com/*' => Http::response($this->says('ok'))]);
+        Http::fake(['generativelanguage.googleapis.com/*' => function () {
+            static $tool = true;
+
+            $response = $tool ? $this->wants([['get_stock_status', []]]) : $this->says('ok');
+            $tool = ! $tool;
+
+            return Http::response($response);
+        }]);
 
         for ($i = 0; $i < 12; $i++) {
             $this->ask($owner, $shop)->assertOk();

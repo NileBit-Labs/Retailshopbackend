@@ -33,7 +33,7 @@ return [
     // use a paid key.
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.8-flash'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
         'timeout' => (int) env('GEMINI_TIMEOUT', 45),
         // Questions one shop may ask per day, so a runaway script can't run up the bill.

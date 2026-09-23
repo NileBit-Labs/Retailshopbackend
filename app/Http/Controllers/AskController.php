@@ -54,16 +54,16 @@ class AskController extends Controller
 
             $result = $agent->answer($shop, $role, $question, $data['history'] ?? []);
         } catch (AskException $e) {
-            // A question Google failed on is still recorded (and counted), so a broken key can't be
-            // hammered for free. Refusing one up front costs nothing and isn't.
+            // Provider and grounding failures are retained for diagnosis, but do not use a shop's
+            // daily allowance. The existing per-minute limiter still bounds repeated attempts.
             if (! in_array($e->errorCode, ['not_configured', 'daily_limit'], true)) {
-                $this->record($request, $question, null, [], ['input' => 0, 'output' => 0], $started, 'error', $e->errorCode);
+                $this->record($request, $question, null, [], ['input' => 0, 'output' => 0], $started, 'error', $e->errorCode, false);
             }
 
             return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode], $e->httpStatus);
         }
 
-        $this->record($request, $question, $result['answer'], $result['tools'], $result['usage'], $started, $result['status']);
+        $this->record($request, $question, $result['answer'], $result['tools'], $result['usage'], $started, $result['status'], null, true);
 
         return response()->json([
             'answer' => $result['answer'],
@@ -75,14 +75,17 @@ class AskController extends Controller
 
     private function askedToday($shop): int
     {
-        return AskQuery::where('shop_id', $shop->id)->where('created_at', '>=', ReportRange::today($shop)->utcFrom())->count();
+        return AskQuery::where('shop_id', $shop->id)
+            ->where('counts_toward_limit', true)
+            ->where('created_at', '>=', ReportRange::today($shop)->utcFrom())
+            ->count();
     }
 
     /**
      * @param  array<int, array{name: string, label: string}>  $tools
      * @param  array{input: int, output: int}  $usage
      */
-    private function record(Request $request, string $question, ?string $answer, array $tools, array $usage, float $started, string $status, ?string $error = null): void
+    private function record(Request $request, string $question, ?string $answer, array $tools, array $usage, float $started, string $status, ?string $error = null, bool $countsTowardLimit = false): void
     {
         AskQuery::create([
             'shop_id' => $request->attributes->get('shop')->id,
@@ -95,6 +98,7 @@ class AskController extends Controller
             'duration_ms' => (int) round((microtime(true) - $started) * 1000),
             'status' => $status,
             'error' => $error,
+            'counts_toward_limit' => $countsTowardLimit,
         ]);
     }
 

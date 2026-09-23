@@ -46,7 +46,25 @@ class GeminiClient
         }
 
         if ($response->successful()) {
-            return $response->json() ?? [];
+            $data = $response->json();
+
+            // A normal response either has a candidate or explicit prompt feedback. Do not turn
+            // an invalid 2xx body into a misleading successful Ask reply.
+            $hasCandidate = is_array($data)
+                && isset($data['candidates'][0]['content']['parts'])
+                && is_array($data['candidates'][0]['content']['parts']);
+            $hasPromptFeedback = is_array($data) && isset($data['promptFeedback']) && is_array($data['promptFeedback']);
+
+            if (! $hasCandidate && ! $hasPromptFeedback) {
+                Log::warning('ask.gemini_malformed_response', [
+                    'status' => $response->status(),
+                    'body' => str_replace($key, '[redacted]', Str::limit($response->body(), 600)),
+                ]);
+
+                throw new AskException('malformed_response', 502, 'The AI service sent an invalid response. Try again in a moment.');
+            }
+
+            return $data;
         }
 
         $this->fail($response, $key);
@@ -64,6 +82,10 @@ class GeminiClient
 
         if ($status === 429) {
             throw new AskException('busy', 429, "The AI service is busy or today's allowance has run out. Try again in a minute.");
+        }
+
+        if ($status === 404 && (str_contains($text, 'model') || str_contains($text, 'not_found'))) {
+            throw new AskException('model_unavailable', 503, 'The configured AI model is unavailable. The owner should check GEMINI_MODEL in the server settings.');
         }
 
         if (in_array($status, [400, 401, 403], true) && (str_contains($text, 'api_key_invalid') || str_contains($text, 'api key not valid') || str_contains($text, 'permission_denied') || $status !== 400)) {

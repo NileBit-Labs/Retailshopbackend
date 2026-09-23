@@ -68,6 +68,14 @@ class AskAgent
             if ($calls === []) {
                 $text = trim(implode("\n", array_map(fn ($p) => (string) ($p['text'] ?? ''), array_filter($parts, fn ($p) => isset($p['text']) && empty($p['thought'])))));
 
+                if ($used === []) {
+                    if (! $this->permitsNoToolReply($text)) {
+                        throw new AskException('ungrounded_response', 502, "I couldn't verify that from your shop records. Please ask about sales, stock, customers, expenses or another specific business figure.");
+                    }
+
+                    return $this->done($this->safeNoToolReply($text), 'blocked', $visuals, $used, $usage);
+                }
+
                 return $text === ''
                     ? $this->done("I couldn't put an answer together. Please try asking again.", 'incomplete', $visuals, $used, $usage)
                     : $this->done($text, 'ok', $visuals, $used, $usage);
@@ -80,6 +88,13 @@ class AskAgent
             foreach ($calls as $call) {
                 $name = (string) ($call['functionCall']['name'] ?? '');
                 $args = $call['functionCall']['args'] ?? [];
+                $id = $call['functionCall']['id'] ?? null;
+
+                // Gemini 3.8 requires the call ID to be returned with its function result. A
+                // missing ID means we cannot safely correlate a result to the model's request.
+                if (! is_string($id) || $id === '') {
+                    throw new AskException('malformed_response', 502, "The AI service sent an invalid response. Try again in a moment.");
+                }
 
                 try {
                     $out = $this->tools->run($name, is_array($args) ? $args : [], $shop, $role);
@@ -97,7 +112,7 @@ class AskAgent
                     $payload = ['error' => 'That figure could not be worked out right now.'];
                 }
 
-                $replies[] = ['functionResponse' => ['name' => $name, 'response' => ['result' => $payload]]];
+                $replies[] = ['functionResponse' => ['id' => $id, 'name' => $name, 'response' => ['result' => $payload]]];
             }
 
             $contents[] = ['role' => 'user', 'parts' => $replies];
@@ -121,6 +136,31 @@ class AskAgent
         }
 
         return ['answer' => $answer, 'status' => $status, 'visuals' => array_slice(array_values($unique), 0, 3), 'tools' => $used, 'usage' => $usage];
+    }
+
+    /** Only explicit unsupported/unavailable/clarification replies may be returned without data. */
+    private function permitsNoToolReply(string $text): bool
+    {
+        $text = Str::lower(trim($text));
+
+        return $text !== '' && (
+            Str::startsWith($text, ["i can't", 'i cannot', "i don't", 'i do not', "i'm unable", 'i am unable', 'sorry, i can\'t', 'sorry, i cannot'])
+            || str_contains($text, 'out of scope')
+            || str_contains($text, 'not available')
+            || str_contains($text, 'please clarify')
+            || str_contains($text, 'could you clarify')
+            || str_contains($text, 'what do you mean')
+        );
+    }
+
+    /** Do not return model-authored business claims when no approved tool produced data. */
+    private function safeNoToolReply(string $text): string
+    {
+        $text = Str::lower($text);
+
+        return str_contains($text, 'clarify') || str_contains($text, 'what do you mean')
+            ? 'Please clarify the product, period or business figure you want to check.'
+            : "I can't verify that from your shop records. I can help with sales, stock, customers, expenses, suppliers and owner-only profit.";
     }
 
     private function instructions(Shop $shop, Role $role): string

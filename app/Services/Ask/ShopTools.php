@@ -53,10 +53,10 @@ class ShopTools
             $this->tool('get_product_performance', 'How one product (or products whose name contains the text) sold in a period: quantity and revenue'.($role === Role::Owner ? ', cost, profit and margin' : '').'.', $when + [
                 'name' => ['type' => 'string', 'description' => 'Part of the product name.'],
             ], ['name']),
-            $this->tool('find_product', 'Look up products by name: price, cost price, current stock, reorder level and status.', [
+            $this->tool('find_product', 'Look up products by name: price, current stock, reorder level and status.'.($role === Role::Owner ? ' Owners may also see cost price and margin.' : ''), [
                 'name' => ['type' => 'string', 'description' => 'Part of the product name (at least 2 letters).'],
             ], ['name']),
-            $this->tool('get_stock_status', 'Stock health: how many products are out or low, the stock value, and which products need reordering.', [
+            $this->tool('get_stock_status', 'Stock health: how many products are out or low, and which products need reordering.'.($role === Role::Owner ? ' Owners may also see stock value.' : ''), [
                 'status' => ['type' => 'string', 'description' => 'attention (out or low, default), out, low or all.'],
                 'limit' => ['type' => 'integer', 'description' => 'How many products to list, 1 to 20. Default 10.'],
             ]),
@@ -88,8 +88,8 @@ class ShopTools
             'get_daily_sales' => $this->dailySales($args, $shop),
             'get_top_products' => $this->topProducts($args, $shop, $role),
             'get_product_performance' => $this->productPerformance($args, $shop, $role),
-            'find_product' => $this->findProduct($args, $shop),
-            'get_stock_status' => $this->stockStatus($args, $shop),
+            'find_product' => $this->findProduct($args, $shop, $role),
+            'get_stock_status' => $this->stockStatus($args, $shop, $role),
             'get_payment_methods' => $this->paymentMethods($args, $shop),
             'get_sales_by_cashier' => $this->salesByCashier($args, $shop),
             'get_expenses' => $this->expenses($args, $shop),
@@ -237,7 +237,7 @@ class ShopTools
     }
 
     /** @return array<string, mixed> */
-    private function findProduct(array $args, Shop $shop): array
+    private function findProduct(array $args, Shop $shop, Role $role): array
     {
         $term = $this->term($args['name'] ?? '');
 
@@ -252,12 +252,13 @@ class ShopTools
             'category' => $p->category?->name,
             'unit' => $p->base_unit,
             'selling_price' => $p->selling_price,
-            'cost_price' => $p->current_cost,
-            'margin_percent' => $p->selling_price > 0 ? round(($p->selling_price - $p->current_cost) / $p->selling_price * 100, 1) : null,
             'stock' => round((float) ($p->stock ?? 0), 3),
             'reorder_level' => (float) $p->low_stock_threshold,
             'status' => $p->status,
-        ])->all();
+        ] + ($role === Role::Owner ? [
+            'cost_price' => $p->current_cost,
+            'margin_percent' => $p->selling_price > 0 ? round(($p->selling_price - $p->current_cost) / $p->selling_price * 100, 1) : null,
+        ] : []))->all();
 
         return [
             'result' => ['matches' => $rows, 'note' => $rows === [] ? 'No product has that name.' : null],
@@ -266,7 +267,7 @@ class ShopTools
     }
 
     /** @return array<string, mixed> */
-    private function stockStatus(array $args, Shop $shop): array
+    private function stockStatus(array $args, Shop $shop, Role $role): array
     {
         $status = $args['status'] ?? 'attention';
         $limit = max(1, min(20, (int) ($args['limit'] ?? 10)));
@@ -275,7 +276,7 @@ class ShopTools
             throw new ToolError('status must be attention, out, low or all.');
         }
 
-        $summary = $this->stock->report($shop, true, null, null, 1)['summary'];
+        $summary = $this->stock->report($shop, $role === Role::Owner, null, null, 1)['summary'];
         $fetch = fn (?string $s) => $this->stock->report($shop, false, $s, null, 1)['page']['data'];
 
         $items = match ($status) {
