@@ -35,7 +35,7 @@ services:
         value: database
       - key: RUN_MIGRATIONS_ON_BOOT
         value: "true"
-      - key: GEMINI_API_KEY
+      - key: GROQ_API_KEY
         sync: false
 databases:
   - name: nilebit-retail-db

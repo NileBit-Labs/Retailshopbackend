@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Puts a question to Gemini and lets it use the shop tools to find the figures, then returns its
+ * Puts a question to Groq and lets it use the shop tools to find the figures, then returns its
  * answer together with the charts the tools produced. The model can only look things up: it has
  * no way to change anything, and the shop it looks at is fixed by who is signed in.
  */
@@ -22,7 +22,7 @@ class AskAgent
     /** Earlier turns of the conversation that are sent along, for follow-up questions. */
     public const HISTORY_TURNS = 8;
 
-    public function __construct(private GeminiClient $gemini, private ShopTools $tools) {}
+    public function __construct(private GroqClient $groq, private ShopTools $tools) {}
 
     /**
      * @param  array<int, array{role: string, text: string}>  $history
@@ -32,13 +32,13 @@ class AskAgent
      */
     public function answer(Shop $shop, Role $role, string $question, array $history = []): array
     {
-        $contents = [];
+        $messages = [['role' => 'system', 'content' => $this->instructions($shop, $role)]];
 
         foreach (array_slice($history, -self::HISTORY_TURNS) as $turn) {
-            $contents[] = ['role' => $turn['role'] === 'assistant' ? 'model' : 'user', 'parts' => [['text' => Str::limit($turn['text'], 4000, '')]]];
+            $messages[] = ['role' => $turn['role'], 'content' => Str::limit($turn['text'], 4000, '')];
         }
 
-        $contents[] = ['role' => 'user', 'parts' => [['text' => $question]]];
+        $messages[] = ['role' => 'user', 'content' => $question];
 
         $declarations = $this->tools->declarations($role);
         $used = [];
@@ -46,27 +46,25 @@ class AskAgent
         $usage = ['input' => 0, 'output' => 0];
 
         for ($round = 1; $round <= self::MAX_ROUNDS; $round++) {
-            $response = $this->gemini->generate([
-                'systemInstruction' => ['parts' => [['text' => $this->instructions($shop, $role)]]],
-                'contents' => $contents,
-                'tools' => [['functionDeclarations' => $declarations]],
-                'toolConfig' => ['functionCallingConfig' => ['mode' => 'AUTO']],
-                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 4096],
-            ]);
+            $response = $this->groq->complete($messages, $declarations);
 
-            $usage['input'] += (int) ($response['usageMetadata']['promptTokenCount'] ?? 0);
-            $usage['output'] += (int) ($response['usageMetadata']['candidatesTokenCount'] ?? 0);
+            $usage['input'] += (int) ($response['usage']['prompt_tokens'] ?? 0);
+            $usage['output'] += (int) ($response['usage']['completion_tokens'] ?? 0);
 
-            $parts = $response['candidates'][0]['content']['parts'] ?? null;
+            $message = $response['choices'][0]['message'] ?? null;
 
-            if (! is_array($parts)) {
+            if (! is_array($message)) {
                 return $this->done("I can't help with that question. Try asking about your sales, stock, customers or expenses.", 'blocked', $visuals, $used, $usage);
             }
 
-            $calls = array_values(array_filter($parts, fn ($p) => isset($p['functionCall'])));
+            $calls = $message['tool_calls'] ?? [];
 
             if ($calls === []) {
-                $text = trim(implode("\n", array_map(fn ($p) => (string) ($p['text'] ?? ''), array_filter($parts, fn ($p) => isset($p['text']) && empty($p['thought'])))));
+                $text = trim((string) ($message['content'] ?? ''));
+
+                if ($text === '' && filled($message['refusal'] ?? null)) {
+                    return $this->done($this->safeNoToolReply('not available'), 'blocked', $visuals, $used, $usage);
+                }
 
                 if ($used === []) {
                     if (! $this->permitsNoToolReply($text)) {
@@ -81,22 +79,35 @@ class AskAgent
                     : $this->done($text, 'ok', $visuals, $used, $usage);
             }
 
-            // Sent back exactly as received, so anything the model needs to continue its thought survives.
-            $contents[] = ['role' => 'model', 'parts' => $parts];
+            // Return the tool calls with their provider-issued IDs, then bind every result to one ID.
+            $messages[] = ['role' => 'assistant', 'content' => $message['content'] ?? null, 'tool_calls' => $calls];
             $replies = [];
 
             foreach ($calls as $call) {
-                $name = (string) ($call['functionCall']['name'] ?? '');
-                $args = $call['functionCall']['args'] ?? [];
-                $id = $call['functionCall']['id'] ?? null;
+                if (! is_array($call) || ! is_array($call['function'] ?? null)) {
+                    throw new AskException('malformed_response', 502, 'The AI service sent an invalid response. Try again in a moment.');
+                }
 
-                // Gemini 3.8 requires the call ID to be returned with its function result. A
+                $name = (string) ($call['function']['name'] ?? '');
+                $id = $call['id'] ?? null;
+
+                // Groq requires the call ID to be returned with its tool result. A
                 // missing ID means we cannot safely correlate a result to the model's request.
                 if (! is_string($id) || $id === '') {
                     throw new AskException('malformed_response', 502, "The AI service sent an invalid response. Try again in a moment.");
                 }
 
                 try {
+                    $arguments = $call['function']['arguments'] ?? null;
+                    if (! is_string($arguments)) {
+                        throw new ToolError('The tool arguments were invalid.');
+                    }
+
+                    $args = json_decode($arguments, true, 512, JSON_THROW_ON_ERROR);
+                    if (! is_array($args)) {
+                        throw new ToolError('The tool arguments must be an object.');
+                    }
+
                     $out = $this->tools->run($name, is_array($args) ? $args : [], $shop, $role);
                     $used[] = ['name' => $name, 'label' => $out['label']];
 
@@ -105,17 +116,17 @@ class AskAgent
                     }
 
                     $payload = $out['result'];
-                } catch (ToolError $e) {
+                } catch (ToolError|\JsonException $e) {
                     $payload = ['error' => $e->getMessage()];
                 } catch (Throwable $e) {
                     report($e);
                     $payload = ['error' => 'That figure could not be worked out right now.'];
                 }
 
-                $replies[] = ['functionResponse' => ['id' => $id, 'name' => $name, 'response' => ['result' => $payload]]];
+                $replies[] = ['role' => 'tool', 'tool_call_id' => $id, 'name' => $name, 'content' => json_encode(['result' => $payload], JSON_THROW_ON_ERROR)];
             }
 
-            $contents[] = ['role' => 'user', 'parts' => $replies];
+            array_push($messages, ...$replies);
         }
 
         return $this->done('That took more looking up than I could finish. Try a narrower question, for example one product or one week.', 'incomplete', $visuals, $used, $usage);

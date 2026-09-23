@@ -28,14 +28,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    // "Ask Your Shop". The key lives only in the backend's .env (never in the frontend). Free-tier
-    // Gemini keys may let Google use what is sent to improve its products, so real shops should
-    // use a paid key.
-    'gemini' => [
-        'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-3.8-flash'),
-        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
-        'timeout' => (int) env('GEMINI_TIMEOUT', 45),
+    // "Ask Your Shop". The key lives only in the backend's .env (never in the frontend).
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'qwen/qwen3.8-27b'),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1/chat/completions'),
+        'timeout' => (int) env('GROQ_TIMEOUT', 45),
         // Questions one shop may ask per day, so a runaway script can't run up the bill.
         'daily_limit' => (int) env('ASK_DAILY_LIMIT', 200),
     ],

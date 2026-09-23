@@ -6,7 +6,7 @@ use App\Enums\Role;
 use App\Models\AskQuery;
 use App\Services\Ask\AskAgent;
 use App\Services\Ask\AskException;
-use App\Services\Ask\GeminiClient;
+use App\Services\Ask\GroqClient;
 use App\Support\ReportRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,21 +15,21 @@ use Illuminate\Support\Str;
 /** Owner/manager only (see routes): the answers draw on sales, costs and customer balances. */
 class AskController extends Controller
 {
-    public function status(Request $request, GeminiClient $gemini): JsonResponse
+    public function status(Request $request, GroqClient $groq): JsonResponse
     {
         $shop = $request->attributes->get('shop');
         $role = $request->attributes->get('shopRole');
 
         return response()->json([
-            'enabled' => $gemini->enabled(),
+            'enabled' => $groq->enabled(),
             'is_owner' => $role === Role::Owner,
             'asked_today' => $this->askedToday($shop),
-            'daily_limit' => (int) config('services.gemini.daily_limit'),
+            'daily_limit' => (int) config('services.groq.daily_limit'),
             'suggestions' => $this->suggestions($role),
         ]);
     }
 
-    public function ask(Request $request, AskAgent $agent, GeminiClient $gemini): JsonResponse
+    public function ask(Request $request, AskAgent $agent, GroqClient $groq): JsonResponse
     {
         $data = $request->validate([
             'question' => ['required', 'string', 'min:2', 'max:500'],
@@ -44,11 +44,11 @@ class AskController extends Controller
         $question = trim($data['question']);
 
         try {
-            if (! $gemini->enabled()) {
-                throw new AskException('not_configured', 503, "The AI assistant isn't set up yet. The owner needs to add a GEMINI_API_KEY to the server's settings.");
+            if (! $groq->enabled()) {
+                throw new AskException('not_configured', 503, "The AI assistant isn't set up yet. The owner needs to add a GROQ_API_KEY to the server's settings.");
             }
 
-            if ($this->askedToday($shop) >= (int) config('services.gemini.daily_limit')) {
+            if ($this->askedToday($shop) >= (int) config('services.groq.daily_limit')) {
                 throw new AskException('daily_limit', 429, "You've reached today's limit of questions for this shop. It resets at midnight.");
             }
 
