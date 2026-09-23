@@ -45,7 +45,7 @@ class AskController extends Controller
 
         try {
             if (! $groq->enabled()) {
-                throw new AskException('not_configured', 503, 'Ask Your Shop is temporarily unavailable. Please try again later.');
+                throw new AskException('not_configured', 503, 'Ask NileBot is temporarily unavailable. Please try again later.');
             }
 
             if ($this->askedToday($shop) >= (int) config('services.groq.daily_limit')) {

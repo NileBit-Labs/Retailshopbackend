@@ -28,7 +28,7 @@ class GroqClient
         $key = config('services.groq.key');
 
         if (blank($key)) {
-            throw new AskException('not_configured', 503, 'Ask Your Shop is temporarily unavailable. Please try again later.');
+            throw new AskException('not_configured', 503, 'Ask NileBot is temporarily unavailable. Please try again later.');
         }
 
         $payload = [
@@ -104,13 +104,13 @@ class GroqClient
         if ($status === 404 || (str_contains($text, 'model') && (str_contains($text, 'not found') || str_contains($text, 'decommissioned') || str_contains($text, 'unavailable')))) {
             $this->logFailure('model_unavailable', $status, $started);
 
-            throw new AskException('model_unavailable', 503, 'Ask Your Shop is temporarily unavailable. Please try again later.');
+            throw new AskException('model_unavailable', 503, 'Ask NileBot is temporarily unavailable. Please try again later.');
         }
 
         if (in_array($status, [400, 401, 403], true) && (str_contains($text, 'api key') || str_contains($text, 'invalid_api_key') || str_contains($text, 'authentication') || $status !== 400)) {
             $this->logFailure('authentication_failed', $status, $started);
 
-            throw new AskException('invalid_key', 502, 'Ask Your Shop is temporarily unavailable. Please try again later.');
+            throw new AskException('invalid_key', 502, 'Ask NileBot is temporarily unavailable. Please try again later.');
         }
 
         if ($status >= 500) {

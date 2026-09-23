@@ -115,6 +115,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reports/sales', [ReportController::class, 'sales']);
         Route::get('/reports/stock', [ReportController::class, 'stock']);
         Route::get('/reports/debt', [ReportController::class, 'debt']);
+        Route::get('/reports/export/pdf', [ReportController::class, 'exportPdf']);
+        Route::get('/reports/export/csv', [ReportController::class, 'exportCsv']);
 
         Route::get('/staff', [StaffController::class, 'index']);
         Route::post('/staff', [StaffController::class, 'store']);

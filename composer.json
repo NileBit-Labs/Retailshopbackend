@@ -6,8 +6,9 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "ext-pdo_pgsql": "*",
         "php": "^8.4",
+        "ext-pdo_pgsql": "*",
+        "barryvdh/laravel-dompdf": "^3.1",
         "laravel/framework": "^13.17",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0"

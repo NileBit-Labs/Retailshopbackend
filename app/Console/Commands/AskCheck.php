@@ -8,14 +8,14 @@ use Illuminate\Console\Command;
 
 /**
  * Proves the AI settings work before anyone relies on them: the key is accepted, the model exists
- * and a tool-calling round trip (the thing "Ask Your Shop" depends on) comes back. It never prints
+ * and a tool-calling round trip (the thing "Ask NileBot" depends on) comes back. It never prints
  * the key.
  */
 class AskCheck extends Command
 {
     protected $signature = 'ask:check';
 
-    protected $description = 'Check the Groq key and model used by Ask Your Shop';
+    protected $description = 'Check the Groq key and model used by Ask NileBot';
 
     public function handle(GroqClient $groq): int
     {
@@ -69,7 +69,7 @@ class AskCheck extends Command
                 return self::FAILURE;
             }
 
-            $this->info('2/2  Tool calling works end to end. Ask Your Shop is ready to use.');
+            $this->info('2/2  Tool calling works end to end. Ask NileBot is ready to use.');
 
             return self::SUCCESS;
         } catch (AskException $e) {

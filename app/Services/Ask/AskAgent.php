@@ -94,7 +94,7 @@ class AskAgent
                 // Groq requires the call ID to be returned with its tool result. A
                 // missing ID means we cannot safely correlate a result to the model's request.
                 if (! is_string($id) || $id === '') {
-                    throw new AskException('malformed_response', 502, "The AI service sent an invalid response. Try again in a moment.");
+                    throw new AskException('malformed_response', 502, 'The AI service sent an invalid response. Try again in a moment.');
                 }
 
                 try {
@@ -183,7 +183,7 @@ class AskAgent
             : 'You are talking to a manager. Profit and cost-of-goods figures are for the owner only: never work them out or hint at them; if asked, say the owner can see them in Reports.';
 
         return <<<PROMPT
-You are "Ask Your Shop", the business assistant for {$shop->name}, a small retail shop in Uganda. {$access}
+You are "Ask NileBot", the business assistant for {$shop->name}, a small retail shop in Uganda. {$access}
 Today is {$today->format('l j F Y')} (time zone {$today->getTimezone()->getName()}). All money is Uganda shillings; write amounts like "UGX 45,000".
 
 How to work:
