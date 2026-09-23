@@ -111,20 +111,39 @@ class ReportController extends Controller
     }
 
     public function exportPdf(Request $request, ReportExport $export): Response
-    {
-        $shop = $request->attributes->get('shop');
-        $data = $export->summary($request, $shop, $request->attributes->get('shopRole'));
-        $range = $data['range'];
-        $filename = $this->filename($shop->name, 'summary', $range);
+{
+    $shop = $request->attributes->get('shop');
+    $role = $request->attributes->get('shopRole');
+    $data = $export->summary($request, $shop, $role);
+    $range = $data['range'];
 
-        return Pdf::loadView('reports.summary-pdf', [
-            'shop' => $shop,
-            'role' => $request->attributes->get('shopRole'),
-            'range' => $range,
-            'report' => $data,
-            'generatedAt' => now($range->timezone),
-        ])->setPaper('a4')->download($filename.'.pdf');
+    $filename = $this->filename($shop->name, 'summary', $range);
+
+    $logoPath = resource_path('images/nilebit-pos-icon.svg');
+    $logoDataUri = null;
+
+    if (is_file($logoPath)) {
+        $logo = file_get_contents($logoPath);
+
+        if ($logo !== false) {
+            $logoDataUri = 'data:image/svg+xml;base64,'.base64_encode($logo);
+        }
     }
+
+    $pdf = Pdf::loadView('reports.summary-pdf', [
+        'shop' => $shop,
+        'role' => $role,
+        'range' => $range,
+        'report' => $data,
+        'generatedAt' => now($range->timezone),
+        'logoDataUri' => $logoDataUri,
+        'reportTitle' => 'Business Overview',
+    ])
+        ->setPaper('a4', 'portrait')
+        ->setOption('isPhpEnabled', true);
+
+    return $pdf->download($filename.'.pdf');
+}
 
     public function exportCsv(Request $request, ReportExport $export): Response
     {
