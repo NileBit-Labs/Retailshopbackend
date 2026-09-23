@@ -9,9 +9,11 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -90,8 +92,13 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        // Do not reveal whether an address is registered.
-        Password::sendResetLink(['email' => $data['email']]);
+        // Do not reveal whether an address is registered, or whether mail delivery is temporarily
+        // unavailable. The latter would otherwise become an account-enumeration side channel.
+        try {
+            Password::sendResetLink(['email' => $data['email']]);
+        } catch (Throwable $e) {
+            Log::warning('password_reset_delivery_failed', ['exception' => $e::class]);
+        }
 
         return response()->json([
             'message' => 'If an account exists for that email, a password reset link has been sent.',
