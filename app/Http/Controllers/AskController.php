@@ -45,7 +45,7 @@ class AskController extends Controller
 
         try {
             if (! $groq->enabled()) {
-                throw new AskException('not_configured', 503, "The AI assistant isn't set up yet. The owner needs to add a GROQ_API_KEY to the server's settings.");
+                throw new AskException('not_configured', 503, 'Ask Your Shop is temporarily unavailable. Please try again later.');
             }
 
             if ($this->askedToday($shop) >= (int) config('services.groq.daily_limit')) {

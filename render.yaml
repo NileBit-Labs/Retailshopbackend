@@ -55,6 +55,12 @@ services:
         value: "true"
       - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_MODEL
+        value: qwen/qwen3.8-27b
+      - key: GROQ_REASONING_EFFORT
+        value: none
+      - key: GROQ_REASONING_FORMAT
+        value: hidden
 databases:
   - name: nilebit-retail-db
     plan: free

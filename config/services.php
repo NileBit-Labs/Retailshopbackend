@@ -34,6 +34,10 @@ return [
         'model' => env('GROQ_MODEL', 'qwen/qwen3.8-27b'),
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1/chat/completions'),
         'timeout' => (int) env('GROQ_TIMEOUT', 45),
+        // Keep this business assistant in Qwen's normal instruction mode. Hidden reasoning avoids
+        // returning internal reasoning content while preserving OpenAI-compatible tool calls.
+        'reasoning_effort' => env('GROQ_REASONING_EFFORT', 'none'),
+        'reasoning_format' => env('GROQ_REASONING_FORMAT', 'hidden'),
         // Questions one shop may ask per day, so a runaway script can't run up the bill.
         'daily_limit' => (int) env('ASK_DAILY_LIMIT', 200),
     ],
