@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -79,6 +82,48 @@ class AuthController extends Controller
             'user' => $user->fresh(['organization', 'shopRoles.shop']),
             'token' => $token,
         ]);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        // Do not reveal whether an address is registered.
+        Password::sendResetLink(['email' => $data['email']]);
+
+        return response()->json([
+            'message' => 'If an account exists for that email, a password reset link has been sent.',
+        ]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'token' => ['required', 'string'],
+            'password' => ['required', 'string', 'confirmed', 'min:8', 'max:100'],
+        ]);
+
+        $status = Password::reset($data, function (User $user, string $password): void {
+            $user->forceFill([
+                'password' => Hash::make($password),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            $user->tokens()->delete();
+
+            event(new PasswordReset($user));
+        });
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'token' => ['The password reset link is invalid or has expired.'],
+            ]);
+        }
+
+        return response()->json(['message' => 'Password reset. Please sign in with your new password.']);
     }
 
     public function changePassword(Request $request)
