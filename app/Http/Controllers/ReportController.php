@@ -55,6 +55,8 @@ class ReportController extends Controller
         $daily = $analytics->daily($shop, $range, withCost: true);
         $expensesByDay = $analytics->expensesByDay($shop, $range);
         $expenses = $analytics->expensesByCategory($shop, $range);
+        $lossesByDay = $analytics->stockLossesByDay($shop, $range);
+        $losses = array_sum($lossesByDay);
 
         $cost = array_sum(array_column($daily, 'cost_of_goods'));
         $expenseTotal = array_sum(array_column($expenses, 'amount'));
@@ -73,14 +75,18 @@ class ReportController extends Controller
                 'margin' => SalesAnalytics::margin($gross, $summary['net_sales']),
                 'expenses' => $expenseTotal,
                 'operating_profit' => $gross - $expenseTotal,
+                'stock_losses' => $losses,
+                'net_profit' => $gross - $expenseTotal - $losses,
             ],
-            'daily' => array_map(function (array $d) use ($expensesByDay) {
+            'daily' => array_map(function (array $d) use ($expensesByDay, $lossesByDay) {
                 $expense = $expensesByDay[$d['date']] ?? 0;
                 $profit = $d['net_sales'] - $d['cost_of_goods'];
 
                 return [
                     'date' => $d['date'], 'net_sales' => $d['net_sales'], 'cost_of_goods' => $d['cost_of_goods'],
                     'gross_profit' => $profit, 'expenses' => $expense, 'operating_profit' => $profit - $expense,
+                    'stock_losses' => $lossesByDay[$d['date']] ?? 0,
+                    'net_profit' => $profit - $expense - ($lossesByDay[$d['date']] ?? 0),
                 ];
             }, $daily),
             'expenses' => $expenses,
@@ -111,39 +117,39 @@ class ReportController extends Controller
     }
 
     public function exportPdf(Request $request, ReportExport $export): Response
-{
-    $shop = $request->attributes->get('shop');
-    $role = $request->attributes->get('shopRole');
-    $data = $export->summary($request, $shop, $role);
-    $range = $data['range'];
+    {
+        $shop = $request->attributes->get('shop');
+        $role = $request->attributes->get('shopRole');
+        $data = $export->summary($request, $shop, $role);
+        $range = $data['range'];
 
-    $filename = $this->filename($shop->name, 'summary', $range);
+        $filename = $this->filename($shop->name, 'summary', $range);
 
-    $logoPath = resource_path('images/nilebit-pos-icon.svg');
-    $logoDataUri = null;
+        $logoPath = resource_path('images/nilebit-pos-icon.svg');
+        $logoDataUri = null;
 
-    if (is_file($logoPath)) {
-        $logo = file_get_contents($logoPath);
+        if (is_file($logoPath)) {
+            $logo = file_get_contents($logoPath);
 
-        if ($logo !== false) {
-            $logoDataUri = 'data:image/svg+xml;base64,'.base64_encode($logo);
+            if ($logo !== false) {
+                $logoDataUri = 'data:image/svg+xml;base64,'.base64_encode($logo);
+            }
         }
+
+        $pdf = Pdf::loadView('reports.summary-pdf', [
+            'shop' => $shop,
+            'role' => $role,
+            'range' => $range,
+            'report' => $data,
+            'generatedAt' => now($range->timezone),
+            'logoDataUri' => $logoDataUri,
+            'reportTitle' => 'Business Overview',
+        ])
+            ->setPaper('a4', 'portrait')
+            ->setOption('isPhpEnabled', true);
+
+        return $pdf->download($filename.'.pdf');
     }
-
-    $pdf = Pdf::loadView('reports.summary-pdf', [
-        'shop' => $shop,
-        'role' => $role,
-        'range' => $range,
-        'report' => $data,
-        'generatedAt' => now($range->timezone),
-        'logoDataUri' => $logoDataUri,
-        'reportTitle' => 'Business Overview',
-    ])
-        ->setPaper('a4', 'portrait')
-        ->setOption('isPhpEnabled', true);
-
-    return $pdf->download($filename.'.pdf');
-}
 
     public function exportCsv(Request $request, ReportExport $export): Response
     {
