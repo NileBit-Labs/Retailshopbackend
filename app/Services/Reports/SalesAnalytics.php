@@ -231,6 +231,20 @@ class SalesAnalytics
             ->all();
     }
 
+    /** @return array<string, int> local date => standalone damaged or lost stock at its frozen cost */
+    public function stockLossesByDay(Shop $shop, ReportRange $range): array
+    {
+        $day = $range->localDateSql('created_at');
+
+        return DB::table('stock_movements')->where('shop_id', $shop->id)
+            ->whereIn('movement_type', ['DAMAGE', 'LOSS'])
+            ->where('quantity_delta', '<', 0)
+            ->whereBetween('created_at', [$range->utcFrom(), $range->utcTo()])
+            ->selectRaw("{$day} as day, SUM(ROUND(-quantity_delta * unit_cost)) as cost")
+            ->groupByRaw($day)->get()
+            ->mapWithKeys(fn ($row) => [$row->day => (int) $row->cost])->all();
+    }
+
     /** Sales rung up by one person, e.g. for a cashier's own view. @return array{sales_count: int, total: int, average_sale: int} */
     public function forCashier(Shop $shop, ReportRange $range, int $userId): array
     {
