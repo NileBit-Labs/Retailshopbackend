@@ -18,9 +18,7 @@ services:
       - key: CORS_ALLOWED_ORIGINS
         sync: false
       - key: DATABASE_URL
-        fromDatabase:
-          name: nilebit-retail-db
-          property: connectionString
+        sync: false
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_SSLMODE
@@ -61,6 +59,3 @@ services:
         value: none
       - key: GROQ_REASONING_FORMAT
         value: hidden
-databases:
-  - name: nilebit-retail-db
-    plan: free
